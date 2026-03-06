@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>中集智历 - 数字化工作效能平台</title>
+    
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 引入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- 引入 Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* 基础样式 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            background-color: #f9fafb;
+        }
+        /* 滚动条美化 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* 移动端隐藏滚动条 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* 动画 */
+        .dropdown-menu { z-index: 50; }
+        .fade-in { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body class="text-gray-800 h-screen overflow-hidden">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // ==========================================
+        // 1. React 引用
+        // ==========================================
+        const { useState, useEffect, useMemo } = React;
+
+        // ==========================================
+        // 2. 工具函数：日历文件生成
+        // ==========================================
+        const generateICSContent = (tasks) => {
+            const formatDate = (dateStr, isEnd = false) => {
+                const d = new Date(dateStr);
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                // 默认全天事件：开始 00:00，结束 23:59
+                return `${year}${month}${day}`;
+            };
+
+            const events = tasks.map(task => `
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:${formatDate(task.date)}
+DTEND;VALUE=DATE:${formatDate(task.date)}
+SUMMARY:${task.title} (中集智历)
+DESCRIPTION:类别: ${task.category}\\n负责人: ${task.person}\\n交付物: ${task.deliverables}
+LOCATION:
+END:VEVENT
+`).join('');
+
+            return `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//CIMC//SmartCalendar//CN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+ ${events}
+END:VCALENDAR`;
+        };
+
+        const downloadICS = (filename, content) => {
+            const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        const exportAllToICS = (tasks) => {
+            const content = generateICSContent(tasks);
+            downloadICS(`中集智历_全部任务_${new Date().toISOString().slice(0,10)}.ics`, content);
+        };
+
+        const exportSingleTaskToICS = (task) => {
+            const content = generateICSContent([task]);
+            downloadICS(`${task.title}.ics`, content);
+        };
+
+        // ==========================================
+        // 3. 图标组件 (标准定义，避免动态生成报错)
+        // ==========================================
+        const Icon = ({ pathData, size = 20, className = "" }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+            >
+                {pathData}
+            </svg>
+        );
+
+        const Menu = (props) => <Icon {...props} pathData={<><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>} />;
+        const X = (props) => <Icon {...props} pathData={<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>} />;
+        const Calendar = (props) => <Icon {...props} pathData={<><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>} />;
+        const CheckSquare = (props) => <Icon {...props} pathData={<><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>} />;
+        const FileText = (props) => <Icon {...props} pathData={<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>} />;
+        const ChevronLeft = (props) => <Icon {...props} pathData={<><polyline points="15 18 9 12 15 6"/></>} />;
+        const ChevronRight = (props) => <Icon {...props} pathData={<><polyline points="9 18 15 12 9 6"/></>} />;
+        const Plus = (props) => <Icon {...props} pathData={<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>} />;
+        const Search = (props) => <Icon {...props} pathData={<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>} />;
+        const Bell = (props) => <Icon {...props} pathData={<><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></>} />;
+        const Save = (props) => <Icon {...props} pathData={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>} />;
+        const Trash2 = (props) => <Icon {...props} pathData={<><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>} />;
+        const Filter = (props) => <Icon {...props} pathData={<><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></>} />;
+        const User = (props) => <Icon {...props} pathData={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>} />;
+        const LogOut = (props) => <Icon {...props} pathData={<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>} />;
+        const Share2 = (props) => <Icon {...props} pathData={<><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></>} />;
+        const Cloud = (props) => <Icon {...props} pathData={<><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></>} />;
+
+        // ==========================================
+        // 4. 初始数据
+        // ==========================================
+        const INITIAL_DATA = [
+            { id: 1, title: '元旦', date: '2026-01-01', category: 'holiday', type: '法定节假日', person: '-', status: 'completed', deliverables: '-' },
+            { id: 2, title: '2025年度党建工作总结会', date: '2026-01-15', category: 'party', type: '会议', person: '张书记', status: 'completed', deliverables: '年度总结报告' },
+            { id: 3, title: '春节慰问困难党员', date: '2026-02-10', category: 'union', type: '群团活动', person: '李主席', status: 'in_progress', deliverables: '慰问名单、照片' },
+            { id: 4, title: '三八妇女节活动策划', date: '2026-03-01', category: 'union', type: '策划', person: '王干事', status: 'pending', deliverables: '活动方案' },
+            { id: 5, title: '第一季度党员大会', date: '2026-03-25', category: 'party', type: '三会一课', person: '组织委员', status: 'pending', deliverables: '会议纪要' },
+            { id: 6, title: '清明节祭扫烈士陵园', date: '2026-04-04', category: 'party', type: '主题党日', person: '宣传委员', status: 'pending', deliverables: '新闻稿' },
+            { id: 7, title: '五四青年节活动', date: '2026-05-04', category: 'union', type: '群团活动', person: '团委书记', status: 'pending', deliverables: '活动视频' },
+            { id: 8, title: '劳模工作室中期检查', date: '2026-05-20', category: 'admin', type: '督办', person: '办公室主任', status: 'pending', deliverables: '检查报告' },
+            { id: 9, title: '七一建党节表彰大会', date: '2026-07-01', category: 'party', type: '重点节点', person: '全体成员', status: 'pending', deliverables: '表彰决定' },
+            { id: 10, title: '半年度党风廉政建设分析会', date: '2026-07-15', category: 'party', type: '会议', person: '纪检委员', status: 'pending', deliverables: '分析报告' },
+        ];
+
+        const CATEGORY_COLORS = {
+            party: 'bg-red-100 text-red-800 border-red-200',
+            union: 'bg-orange-100 text-orange-800 border-orange-200',
+            admin: 'bg-blue-100 text-blue-800 border-blue-200',
+            holiday: 'bg-green-100 text-green-800 border-green-200',
+        };
+
+        const STATUS_COLORS = {
+            pending: 'bg-gray-100 text-gray-600',
+            in_progress: 'bg-blue-100 text-blue-600',
+            completed: 'bg-green-100 text-green-600',
+            overdue: 'bg-red-100 text-red-600',
+        };
+
+        const STATUS_LABELS = {
+            pending: '未开始',
+            in_progress: '进行中',
+            completed: '已完成',
+            overdue: '已逾期',
+        };
+
+        // ==========================================
+        // 5. 主应用组件
+        // ==========================================
+        function PartyCalendarApp() {
+            const [activeTab, setActiveTab] = useState('calendar');
+            const [currentDate, setCurrentDate] = useState(new Date(2026, 0, 1));
+            const [tasks, setTasks] = useState(INITIAL_DATA);
+            const [showModal, setShowModal] = useState(false);
+            const [editingTask, setEditingTask] = useState(null);
+            
+            // 移动端与筛选状态
+            const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+            const [taskFilter, setTaskFilter] = useState(null);
+
+            // 下拉菜单
+            const [showNotifications, setShowNotifications] = useState(false);
+            const [showUserMenu, setShowUserMenu] = useState(false);
+            
+            // 持久化加载
+            useEffect(() => {
+                try {
+                    const saved = localStorage.getItem('cimc_calendar_2026_data');
+                    if (saved) setTasks(JSON.parse(saved));
+                } catch (e) {
+                    console.error('无法读取本地存储', e);
+                }
+            }, []);
+
+            // 持久化保存
+            useEffect(() => {
+                localStorage.setItem('cimc_calendar_2026_data', JSON.stringify(tasks));
+            }, [tasks]);
+
+            // 统计计算
+            const stats = useMemo(() => {
+                const total = tasks.length;
+                const completed = tasks.filter(t => t.status === 'completed').length;
+                const today = new Date('2026-02-15'); // 模拟今天
+                const overdueTasks = tasks.filter(t => t.status !== 'completed' && new Date(t.date) < today);
+                
+                return { 
+                    total, 
+                    completed, 
+                    overdue: overdueTasks.length,
+                    inProgress: tasks.filter(t => t.status === 'in_progress').length,
+                    overdueTasks, 
+                    completionRate: total ? Math.round((completed / total) * 100) : 0 
+                };
+            }, [tasks]);
+
+            // 处理统计卡片点击
+            const handleStatClick = (filterType) => {
+                setTaskFilter(filterType);
+                setActiveTab('tasks');
+                setMobileMenuOpen(false);
+            };
+
+            // 月度任务过滤
+            const monthTasks = useMemo(() => {
+                return tasks.filter(task => {
+                    const taskDate = new Date(task.date);
+                    return taskDate.getMonth() === currentDate.getMonth() && 
+                           taskDate.getFullYear() === currentDate.getFullYear();
+                });
+            }, [tasks, currentDate]);
+
+            // 日历生成逻辑
+            const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+            const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
+
+            const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+            const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+
+            const handleAddTask = (newTask) => {
+                if (editingTask) {
+                    setTasks(tasks.map(t => t.id === editingTask.id ? { ...newTask, id: t.id } : t));
+                } else {
+                    setTasks([...tasks, { ...newTask, id: Date.now() }]);
+                }
+                setShowModal(false);
+                setEditingTask(null);
+            };
+
+            const handleDeleteTask = (id) => {
+                if (window.confirm('确定要删除这项工作安排吗？')) {
+                    setTasks(tasks.filter(t => t.id !== id));
+                }
+            };
+
+            return (
+                <div className="flex h-screen bg-gray-50 font-sans text-gray-800 relative overflow-hidden">
+                    
+                    {/* 移动端遮罩 */}
+                    {mobileMenuOpen && (
+                        <div 
+                            className="fixed inset-0 bg-black/50 z-20 md:hidden transition-opacity"
+                            onClick={() => setMobileMenuOpen(false)}
+                        ></div>
+                    )}
+
+                    {/* 侧边栏 */}
+                    <div className={`fixed inset-y-0 left-0 z-30 w-64 bg-slate-900 text-white flex flex-col shadow-xl transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                        <div className="p-6 border-b border-slate-700 flex justify-between items-center md:block">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold text-white text-xs tracking-tighter shadow-lg shadow-blue-900/50">
+                                    CIMC
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold tracking-wider leading-tight">中集智历</h1>
+                                    <p className="text-[10px] text-slate-400">数字化工作效能平台</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setMobileMenuOpen(false)} className="md:hidden text-slate-400 hover:text-white">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                            <NavItem icon={<Calendar size={20} />} label="工作日历" active={activeTab === 'calendar'} onClick={() => { setActiveTab('calendar'); setMobileMenuOpen(false); }} />
+                            <NavItem icon={<CheckSquare size={20} />} label="任务列表" active={activeTab === 'tasks'} onClick={() => { setActiveTab('tasks'); setTaskFilter(null); setMobileMenuOpen(false); }} />
+                            <NavItem icon={<FileText size={20} />} label="总结归档" active={activeTab === 'reports'} onClick={() => { setActiveTab('reports'); setMobileMenuOpen(false); }} />
+                            
+                            {/* 日历同步功能 */}
+                            <div className="pt-4 mt-4 border-t border-slate-700">
+                                <p className="px-4 text-xs text-slate-500 mb-2 uppercase">日历管理</p>
+                                <button 
+                                    onClick={() => exportAllToICS(tasks)}
+                                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-all group"
+                                >
+                                    <Cloud size={20} className="text-blue-400 group-hover:text-white" />
+                                    <span className="font-medium text-sm">导出/同步日历</span>
+                                </button>
+                                <p className="px-4 py-2 text-[10px] text-slate-500 leading-relaxed">
+                                    点击下载 .ics 文件，用手机日历打开即可同步全部工作安排。
+                                </p>
+                            </div>
+
+                            {/* 统计信息 */}
+                            <div className="pt-4 mt-4 border-t border-slate-700">
+                                <p className="px-4 text-xs text-slate-500 mb-2 uppercase">部门概况</p>
+                                <div className="px-4 py-2">
+                                    <div className="flex justify-between text-sm mb-1">
+                                        <span className="text-slate-300">年度进度</span>
+                                        <span className="text-red-400 font-bold">{stats.completionRate}%</span>
+                                    </div>
+                                    <div className="w-full bg-slate-700 rounded-full h-2">
+                                        <div className="bg-red-500 h-2 rounded-full transition-all duration-500" style={{ width: `${stats.completionRate}%` }}></div>
+                                    </div>
+                                </div>
+                                <div className="px-4 py-2 grid grid-cols-2 gap-2 text-center">
+                                    <button 
+                                        onClick={() => handleStatClick('overdue')}
+                                        className="bg-slate-800 p-2 rounded border border-transparent hover:border-yellow-500/50 hover:bg-slate-700 transition-all active:scale-95"
+                                    >
+                                        <div className="text-xl font-bold text-yellow-500">{stats.overdue}</div>
+                                        <div className="text-xs text-slate-400">逾期预警</div>
+                                    </button>
+                                    <button 
+                                        onClick={() => handleStatClick('completed')}
+                                        className="bg-slate-800 p-2 rounded border border-transparent hover:border-green-500/50 hover:bg-slate-700 transition-all active:scale-95"
+                                    >
+                                        <div className="text-xl font-bold text-green-500">{stats.completed}</div>
+                                        <div className="text-xs text-slate-400">已办结</div>
+                                    </button>
+                                </div>
+                            </div>
+                        </nav>
+                    </div>
+
+                    {/* 主内容区 */}
+                    <div className="flex-1 flex flex-col overflow-hidden w-full">
+                        {/* 顶部栏 */}
+                        <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 md:px-6 shadow-sm z-10 flex-shrink-0 relative">
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => setMobileMenuOpen(true)} className="md:hidden text-gray-600 hover:bg-gray-100 p-1 rounded">
+                                    <Menu size={24} />
+                                </button>
+                                <h2 className="text-lg font-medium text-gray-700 flex items-center gap-2 truncate">
+                                    {activeTab === 'calendar' && '年度工作可视化'}
+                                    {activeTab === 'tasks' && '工作任务部署台账'}
+                                    {activeTab === 'reports' && '总结与归档管理'}
+                                </h2>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 md:gap-4">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); setEditingTask(null); setShowModal(true); }}
+                                    className="hidden md:flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md shadow-sm text-sm transition-colors"
+                                >
+                                    <Plus size={16} />
+                                    <span>新增工作安排</span>
+                                </button>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); setEditingTask(null); setShowModal(true); }}
+                                    className="md:hidden w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-md active:scale-95"
+                                >
+                                    <Plus size={20} />
+                                </button>
+                                
+                                <div className="relative" onClick={(e) => { e.stopPropagation(); setShowNotifications(!showNotifications); }}>
+                                    <div className={`p-2 rounded-full hover:bg-gray-100 cursor-pointer transition-colors ${showNotifications ? 'bg-blue-50 text-blue-600' : 'text-gray-400'}`}>
+                                        <Bell size={20} />
+                                    </div>
+                                    {stats.overdue > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
+                                    
+                                    {showNotifications && (
+                                        <div className="dropdown-menu absolute right-0 mt-2 w-72 md:w-80 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden fade-in">
+                                            <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                                                <span className="font-bold text-gray-700 text-sm">逾期预警通知</span>
+                                                <span className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{stats.overdue} 项</span>
+                                            </div>
+                                            <div className="max-h-64 overflow-y-auto p-2">
+                                                {stats.overdueTasks.length > 0 ? (
+                                                    stats.overdueTasks.map(task => (
+                                                        <div key={task.id} className="p-3 hover:bg-gray-50 rounded border-b border-gray-50 last:border-0 cursor-pointer group">
+                                                            <div className="flex justify-between mb-1">
+                                                                <span className="text-sm font-medium text-gray-800 group-hover:text-blue-600 line-clamp-1">{task.title}</span>
+                                                                <span className="text-xs text-gray-400 flex-shrink-0 ml-2">{task.date}</span>
+                                                            </div>
+                                                            <div className="text-xs text-gray-500">负责人: {task.person}</div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="text-center py-4 text-sm text-gray-400">暂无逾期任务</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="relative" onClick={(e) => { e.stopPropagation(); setShowUserMenu(!showUserMenu); }}>
+                                    <button className={`flex items-center gap-2 focus:outline-none p-1 rounded-md transition-colors ${showUserMenu ? 'bg-blue-50' : 'hover:bg-gray-100'}`}>
+                                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm ring-2 ring-white">
+                                            管
+                                        </div>
+                                        <div className="hidden md:block text-left">
+                                            <div className="text-sm font-medium text-gray-700">系统管理员</div>
+                                            <div className="text-xs text-gray-400">组织委员</div>
+                                        </div>
+                                    </button>
+
+                                    {showUserMenu && (
+                                        <div className="dropdown-menu absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden fade-in">
+                                            <div className="px-4 py-3 border-b border-gray-100">
+                                                <div className="text-sm font-medium text-gray-800">当前用户</div>
+                                                <div className="text-xs text-gray-500">admin@cimc.com</div>
+                                            </div>
+                                            <div className="py-1">
+                                                <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 flex items-center gap-2">
+                                                    <User size={14} /> 个人中心
+                                                </a>
+                                            </div>
+                                            <div className="border-t border-gray-100">
+                                                <a href="#" className="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                                                    <LogOut size={14} /> 退出登录
+                                                </a>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </header>
+
+                        {/* 内容滚动区 */}
+                        <main className="flex-1 overflow-y-auto p-4 md:p-6 relative">
+                            {activeTab === 'calendar' && (
+                                <div className="pb-10">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-4">
+                                        <div className="flex items-center gap-2 sm:gap-4 bg-white p-2 rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                                            <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"><ChevronLeft size={24} /></button>
+                                            <h2 className="text-lg sm:text-2xl font-bold text-gray-800 whitespace-nowrap">
+                                                {currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月
+                                            </h2>
+                                            <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"><ChevronRight size={24} /></button>
+                                        </div>
+                                        <div className="flex gap-3 sm:gap-4 text-sm flex-wrap justify-center">
+                                            <Legend color="bg-red-500" label="党建" />
+                                            <Legend color="bg-orange-500" label="工会/群团" />
+                                            <Legend color="bg-blue-500" label="行政/督办" />
+                                            <Legend color="bg-green-500" label="节假日" />
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                        {/* 修复：增加 overflow-x-auto 和 no-scrollbar，允许移动端横向滚动查看完整日历 */}
+                                        <div className="overflow-x-auto no-scrollbar">
+                                            <div className="min-w-[600px] w-full md:w-auto">
+                                                <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+                                                    {['日', '一', '二', '三', '四', '五', '六'].map(day => (
+                                                        <div key={day} className="py-3 text-center text-xs sm:text-sm font-semibold text-gray-500">{day}</div>
+                                                    ))}
+                                                </div>
+                                                <div className="grid grid-cols-7 auto-rows-fr bg-gray-200 gap-px">
+                                                    {Array.from({ length: firstDayOfMonth }).map((_, i) => (
+                                                        <div key={`empty-${i}`} className="bg-white min-h-[80px] sm:min-h-[120px]" />
+                                                    ))}
+                                                    
+                                                    {Array.from({ length: daysInMonth }).map((_, i) => {
+                                                        const day = i + 1;
+                                                        const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                                        const dayTasks = tasks.filter(t => t.date === dateStr);
+                                                        const isToday = dateStr === '2026-02-15'; 
+
+                                                        return (
+                                                            <div key={day} className={`bg-white min-h-[80px] sm:min-h-[120px] p-1 sm:p-2 relative group hover:bg-gray-50 transition-colors ${isToday ? 'bg-blue-50' : ''}`}>
+                                                                <div className="flex justify-between items-start mb-1">
+                                                                    <span className={`text-xs sm:text-sm font-medium w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white' : 'text-gray-700'}`}>
+                                                                        {day}
+                                                                    </span>
+                                                                    {dayTasks.length > 0 && (
+                                                                        <span className="text-[10px] sm:text-xs text-gray-400">{dayTasks.length}项</span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="space-y-1">
+                                                                    {dayTasks.slice(0, 2).map(task => (
+                                                                        <div 
+                                                                            key={task.id} 
+                                                                            onClick={() => { setEditingTask(task); setShowModal(true); }}
+                                                                            className={`text-[10px] sm:text-xs p-1 rounded border truncate cursor-pointer hover:opacity-80 transition-opacity ${CATEGORY_COLORS[task.category]}`}
+                                                                            title={`${task.title} - ${task.person}`}
+                                                                        >
+                                                                            {task.title}
+                                                                        </div>
+                                                                    ))}
+                                                                    {dayTasks.length > 2 && (
+                                                                        <div className="text-[10px] text-gray-400 pl-1">+{dayTasks.length - 2} 更多</div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'tasks' && (
+                                <div className="bg-white rounded-lg shadow-sm border border-gray-200 pb-4 flex flex-col">
+                                    <div className="p-3 sm:p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50 sticky top-0 z-10">
+                                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full sm:w-auto">
+                                            <div className="relative w-full sm:w-64">
+                                                <Search size={16} className="absolute left-3 top-2.5 text-gray-400" />
+                                                <input type="text" placeholder="搜索工作内容/负责人..." className="pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-md w-full focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                            </div>
+                                            {taskFilter && (
+                                                <div className="flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1.5 rounded-md text-sm animate-in fade-in">
+                                                    <span>当前筛选: {taskFilter === 'overdue' ? '逾期任务' : '已完成任务'}</span>
+                                                    <button onClick={() => setTaskFilter(null)} className="hover:text-blue-900 font-bold">&times;</button>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="text-sm text-gray-500">
+                                            共 {tasks.filter(t => taskFilter ? (taskFilter === 'overdue' ? t.status !== 'completed' && new Date(t.date) < new Date('2026-02-15') : t.status === taskFilter) : true).length} 项工作
+                                        </div>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-sm min-w-[600px]">
+                                            <thead className="bg-gray-50 text-gray-500">
+                                                <tr>
+                                                    <th className="px-4 sm:px-6 py-3 font-medium">日期节点</th>
+                                                    <th className="px-4 sm:px-6 py-3 font-medium">工作内容</th>
+                                                    <th className="px-4 sm:px-6 py-3 font-medium">类别</th>
+                                                    <th className="px-4 sm:px-6 py-3 font-medium">负责人</th>
+                                                    <th className="px-4 sm:px-6 py-3 font-medium hidden sm:table-cell">交付成果</th>
+                                                    <th className="px-4 sm:px-6 py-3 font-medium">状态</th>
+                                                    <th className="px-4 sm:px-6 py-3 font-medium text-right">操作</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-200">
+                                                {tasks
+                                                    .filter(t => {
+                                                        if (!taskFilter) return true;
+                                                        if (taskFilter === 'completed') return t.status === 'completed';
+                                                        if (taskFilter === 'overdue') return t.status !== 'completed' && new Date(t.date) < new Date('2026-02-15');
+                                                        return true;
+                                                    })
+                                                    .sort((a, b) => new Date(a.date) - new Date(b.date))
+                                                    .map(task => {
+                                                    const isOverdue = task.status !== 'completed' && new Date(task.date) < new Date('2026-02-15');
+                                                    return (
+                                                        <tr key={task.id} className="hover:bg-gray-50 transition-colors">
+                                                            <td className="px-4 sm:px-6 py-4 font-mono text-gray-600 whitespace-nowrap">{task.date}</td>
+                                                            <td className="px-4 sm:px-6 py-4 font-medium text-gray-800 max-w-[150px] sm:max-w-xs truncate">
+                                                                {task.title}
+                                                                {isOverdue && <span className="ml-2 text-red-500 text-xs px-1.5 py-0.5 border border-red-200 bg-red-50 rounded whitespace-nowrap">逾期</span>}
+                                                            </td>
+                                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                                                <span className={`px-2 py-1 rounded text-xs border ${CATEGORY_COLORS[task.category]}`}>
+                                                                    {task.category === 'party' ? '党建' : task.category === 'union' ? '群团' : task.category === 'admin' ? '行政' : '节假'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs text-gray-600">{task.person ? task.person[0] : '?'}</div>
+                                                                    <span className="hidden sm:inline">{task.person}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 sm:px-6 py-4 text-gray-500 max-w-[100px] sm:max-w-xs truncate hidden sm:table-cell">{task.deliverables}</td>
+                                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${isOverdue ? 'border-red-200 bg-red-50 text-red-600' : STATUS_COLORS[task.status]}`}>
+                                                                    <span className={`w-1.5 h-1.5 rounded-full ${isOverdue ? 'bg-red-500' : (task.status === 'completed' ? 'bg-green-500' : 'bg-blue-500')}`}></span>
+                                                                    {isOverdue ? '已逾期' : STATUS_LABELS[task.status]}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 sm:px-6 py-4 text-right whitespace-nowrap">
+                                                                <div className="flex gap-2 justify-end">
+                                                                    <button 
+                                                                        onClick={() => exportSingleTaskToICS(task)} 
+                                                                        className="text-gray-500 hover:text-blue-600 p-1" 
+                                                                        title="添加到手机日历"
+                                                                    >
+                                                                        <Share2 size={14} />
+                                                                    </button>
+                                                                    <button onClick={() => { setEditingTask(task); setShowModal(true); }} className="text-blue-600 hover:text-blue-800 font-medium text-xs">编辑</button>
+                                                                    <button onClick={() => handleDeleteTask(task.id)} className="text-gray-400 hover:text-red-600 p-1"><Trash2 size={14} /></button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'reports' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
+                                    <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
+                                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                            <div className="p-2 bg-blue-100 rounded-lg text-blue-600"><FileText size={20} /></div>
+                                            本月工作小结 ({currentDate.getMonth() + 1}月)
+                                        </h3>
+                                        <textarea 
+                                            className="w-full h-48 p-4 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none text-sm leading-relaxed text-gray-700 whitespace-pre-wrap font-mono"
+                                            placeholder="请输入本月重点工作完成情况、存在问题及下月计划..."
+                                            defaultValue="1. 完成了春节慰问活动的物资采购工作；
+2. 召开了年度党建部署会，明确了各支部责任；
+3. 存在问题：个别支部三会一课记录不规范，已督促整改。"
+                                        ></textarea>
+                                        <div className="mt-4 flex justify-end">
+                                            <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm transition-colors">
+                                                <Save size={16} /> 保存小结
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
+                                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                            <div className="p-2 bg-orange-100 rounded-lg text-orange-600"><User size={20} /></div>
+                                            跨部门协作对接单
+                                        </h3>
+                                        <div className="space-y-4">
+                                            <div className="p-4 bg-orange-50 rounded-lg border border-orange-100 text-sm hover:shadow-md transition-shadow cursor-pointer">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <div className="font-bold text-orange-800">对接人力资源部</div>
+                                                    <span className="text-xs bg-white px-2 py-0.5 rounded border border-orange-200 text-orange-600">待处理</span>
+                                                </div>
+                                                <p className="text-orange-700 mb-2">需确认“七一”表彰人员名单及绩效考核加分项。</p>
+                                                <div className="text-xs text-orange-500 flex items-center gap-1">
+                                                    <Calendar size={12} /> 截止日期: 2026-06-20
+                                                </div>
+                                            </div>
+                                            <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 text-sm hover:shadow-md transition-shadow cursor-pointer">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <div className="font-bold text-blue-800">对接财务部</div>
+                                                    <span className="text-xs bg-white px-2 py-0.5 rounded border border-blue-200 text-blue-600">进行中</span>
+                                                </div>
+                                                <p className="text-blue-700 mb-2">工会三八节活动经费预算审批。</p>
+                                                <div className="text-xs text-blue-500 flex items-center gap-1">
+                                                    <Calendar size={12} /> 截止日期: 2026-02-28
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
+                                            <button className="text-sm text-blue-600 hover:underline">查看全部对接记录 &rarr;</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </main>
+                    </div>
+
+                    {/* 新增/编辑 模态框 */}
+                    {showModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm p-4" onClick={() => setShowModal(false)}>
+                            <div className="bg-white rounded-lg w-full max-w-md shadow-2xl p-4 sm:p-6 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                                <h3 className="text-lg font-bold mb-4 border-b pb-2 flex justify-between items-center">
+                                    <span>{editingTask ? '编辑工作安排' : '新增工作安排'}</span>
+                                    <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
+                                </h3>
+                                <form onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const formData = new FormData(e.target);
+                                    handleAddTask({
+                                        title: formData.get('title'),
+                                        date: formData.get('date'),
+                                        category: formData.get('category'),
+                                        type: '自定义任务',
+                                        person: formData.get('person'),
+                                        status: formData.get('status'),
+                                        deliverables: formData.get('deliverables'),
+                                    });
+                                }} className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">工作内容标题</label>
+                                        <input name="title" required defaultValue={editingTask?.title} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow" placeholder="例如：五四青年节座谈会" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">时间节点</label>
+                                            <input name="date" type="date" required defaultValue={editingTask?.date} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">责任人</label>
+                                            <input name="person" required defaultValue={editingTask?.person || '待定'} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">分类</label>
+                                            <select name="category" defaultValue={editingTask?.category || 'party'} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                                                <option value="party">党建工作</option>
+                                                <option value="union">群团/工会</option>
+                                                <option value="admin">行政/综合</option>
+                                                <option value="holiday">法定节假日</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">当前状态</label>
+                                            <select name="status" defaultValue={editingTask?.status || 'pending'} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                                                <option value="pending">未开始</option>
+                                                <option value="in_progress">进行中</option>
+                                                <option value="completed">已完成</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">需交付成果</label>
+                                        <input name="deliverables" defaultValue={editingTask?.deliverables} className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="例如：会议纪要、活动照片、总结报告" />
+                                    </div>
+                                    <div className="flex justify-end gap-3 mt-6">
+                                        <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition-colors">取消</button>
+                                        <button type="submit" className="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-md shadow-sm transition-colors">保存</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ==========================================
+        // 6. 辅助组件
+        // ==========================================
+        function NavItem({ icon, label, active, onClick }) {
+            return (
+                <button 
+                    onClick={onClick}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        active 
+                        ? 'bg-blue-600 text-white shadow-md' 
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                >
+                    {icon}
+                    <span className="font-medium text-sm">{label}</span>
+                </button>
+            );
+        }
+
+        function Legend({ color, label }) {
+            return (
+                <div className="flex items-center gap-1.5">
+                    <span className={`w-3 h-3 rounded-full ${color}`}></span>
+                    <span className="text-gray-600">{label}</span>
+                </div>
+            );
+        }
+
+        // ==========================================
+        // 7. 渲染入口
+        // ==========================================
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<PartyCalendarApp />);
+    </script>
+</body>
+</html>

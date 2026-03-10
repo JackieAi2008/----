@@ -7,11 +7,11 @@
 
     <template v-else-if="project">
       <!-- 项目头部 -->
-      <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        <div class="flex items-start justify-between">
+      <div class="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
+        <div class="flex flex-col sm:flex-row items-start justify-between gap-4">
           <div>
-            <h2 class="text-2xl font-bold text-gray-800">{{ project.name }}</h2>
-            <p v-if="project.description" class="text-gray-500 mt-2">{{ project.description }}</p>
+            <h2 class="text-xl sm:text-2xl font-bold text-gray-800">{{ project.name }}</h2>
+            <p v-if="project.description" class="text-sm sm:text-base text-gray-500 mt-2">{{ project.description }}</p>
             <div class="flex items-center gap-4 mt-4">
               <span
                 class="px-2 py-1 rounded-full text-xs"
@@ -24,7 +24,7 @@
               </span>
             </div>
           </div>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
             <button
               v-if="isOwner"
               @click="openEditDialog"
@@ -50,9 +50,9 @@
       </div>
 
       <!-- 成员列表 -->
-      <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        <h3 class="text-lg font-semibold mb-4">项目成员</h3>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
+        <h3 class="text-base sm:text-lg font-semibold mb-4">项目成员</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <div
             v-for="member in members"
             :key="member.id"
@@ -70,9 +70,9 @@
       </div>
 
       <!-- 任务列表 -->
-      <div class="bg-white rounded-lg border border-gray-200 p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold">任务列表</h3>
+      <div class="bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4">
+          <h3 class="text-base sm:text-lg font-semibold">任务列表</h3>
           <button
             @click="showCreateTask = true"
             class="flex items-center gap-2 px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"

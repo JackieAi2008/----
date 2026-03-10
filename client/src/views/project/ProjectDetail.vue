@@ -71,15 +71,29 @@
 
       <!-- 任务列表 -->
       <div class="bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4">
-          <h3 class="text-base sm:text-lg font-semibold">任务列表</h3>
-          <button
-            @click="showCreateTask = true"
-            class="flex items-center gap-2 px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            <Plus class="w-4 h-4" />
-            新建任务
-          </button>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4">
+          <div>
+            <h3 class="text-base sm:text-lg font-semibold text-gray-800">任务列表</h3>
+            <p class="text-sm text-gray-500 mt-1">
+              共 {{ taskStats.total }} 个任务 · 已完成 {{ taskStats.done }} · 进行中 {{ taskStats.inProgress }}
+            </p>
+          </div>
+          <div class="flex items-center gap-3">
+            <!-- 进度条 -->
+            <div v-if="taskStats.total > 0" class="hidden sm:block w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                class="h-full bg-green-500 rounded-full transition-all duration-300"
+                :style="{ width: `${(taskStats.done / taskStats.total) * 100}%` }"
+              ></div>
+            </div>
+            <button
+              @click="showCreateTask = true"
+              class="flex items-center justify-center gap-2 px-3 py-1.5 sm:py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <Plus class="w-4 h-4" />
+              新建任务
+            </button>
+          </div>
         </div>
 
         <div v-if="tasks.length === 0" class="text-center py-8 text-gray-500">
@@ -373,6 +387,15 @@ const project = computed(() => projectStore.currentProject)
 
 const isOwner = computed(() => {
   return project.value?.ownerId === authStore.user?.id
+})
+
+// 任务统计
+const taskStats = computed(() => {
+  const total = tasks.value.length
+  const done = tasks.value.filter(t => t.status === 'DONE').length
+  const inProgress = tasks.value.filter(t => t.status === 'IN_PROGRESS').length
+  const todo = tasks.value.filter(t => t.status === 'TODO').length
+  return { total, done, inProgress, todo }
 })
 
 // 可移交的成员列表（排除当前负责人）

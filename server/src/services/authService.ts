@@ -12,6 +12,7 @@ interface RegisterData {
   nickname: string
   securityQuestion: number
   securityAnswer: string
+  departmentId?: string // 可选：申请加入的部门
 }
 
 /**
@@ -20,7 +21,12 @@ interface RegisterData {
 export async function login(email: string, password: string) {
   // 查找用户
   const user = await prisma.user.findUnique({
-    where: { email }
+    where: { email },
+    include: {
+      department: {
+        select: { id: true, name: true }
+      }
+    }
   })
 
   if (!user) {
@@ -37,8 +43,22 @@ export async function login(email: string, password: string) {
     throw new ApiError(401, '邮箱或密码错误')
   }
 
+  // 检查是否为部门管理员
+  const managedDepartment = await prisma.department.findUnique({
+    where: { adminId: user.id },
+    select: { id: true, name: true }
+  })
+
+  // 确定用户角色
+  let role = 'MEMBER'
+  if (user.isAdmin) {
+    role = 'ADMIN'
+  } else if (managedDepartment) {
+    role = 'DEPARTMENT_ADMIN'
+  }
+
   // 生成token
-  const token = generateToken({ userId: user.id, role: user.isAdmin ? 'ADMIN' : 'USER' })
+  const token = generateToken({ userId: user.id, role })
 
   return {
     token,
@@ -48,7 +68,11 @@ export async function login(email: string, password: string) {
       nickname: user.nickname,
       avatar: user.avatar,
       bio: user.bio,
-      isAdmin: user.isAdmin
+      isAdmin: user.isAdmin,
+      isDepartmentAdmin: !!managedDepartment,
+      departmentId: user.departmentId,
+      department: user.department,
+      managedDepartment
     }
   }
 }
@@ -57,7 +81,7 @@ export async function login(email: string, password: string) {
  * 用户注册
  */
 export async function register(data: RegisterData) {
-  const { email, password, nickname, securityQuestion, securityAnswer } = data
+  const { email, password, nickname, securityQuestion, securityAnswer, departmentId } = data
 
   // 检查邮箱是否已注册
   const existingUser = await prisma.user.findUnique({
@@ -66,6 +90,16 @@ export async function register(data: RegisterData) {
 
   if (existingUser) {
     throw new ApiError(400, '该邮箱已被注册')
+  }
+
+  // 如果指定了部门，检查部门是否存在
+  if (departmentId) {
+    const department = await prisma.department.findUnique({
+      where: { id: departmentId }
+    })
+    if (!department) {
+      throw new ApiError(400, '指定的部门不存在')
+    }
   }
 
   // 加密密码和安全答案
@@ -77,7 +111,13 @@ export async function register(data: RegisterData) {
     data: {
       email,
       password: hashedPassword,
-      nickname
+      nickname,
+      departmentId: departmentId || null
+    },
+    include: {
+      department: {
+        select: { id: true, name: true }
+      }
     }
   })
 
@@ -91,7 +131,7 @@ export async function register(data: RegisterData) {
   })
 
   // 生成token
-  const token = generateToken({ userId: user.id, role: 'USER' })
+  const token = generateToken({ userId: user.id, role: 'MEMBER' })
 
   return {
     token,
@@ -101,7 +141,10 @@ export async function register(data: RegisterData) {
       nickname: user.nickname,
       avatar: user.avatar,
       bio: user.bio,
-      isAdmin: user.isAdmin
+      isAdmin: user.isAdmin,
+      isDepartmentAdmin: false,
+      departmentId: user.departmentId,
+      department: user.department
     }
   }
 }

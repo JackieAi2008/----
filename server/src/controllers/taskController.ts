@@ -6,13 +6,30 @@ import prisma from '../config/database.js'
 import { ApiError } from '../middlewares/errorHandler.js'
 import { getTaskPermissions } from '../middlewares/taskPermission.js'
 import { createNextRecurringTask } from '../services/recurringTaskService.js'
+import { AuthRequest } from '../middlewares/auth.js'
+
+// 用户选择字段（包含部门信息）
+const userSelectWithDept = {
+  id: true,
+  nickname: true,
+  avatar: true,
+  department: {
+    select: { id: true, name: true }
+  }
+}
 
 /**
  * 获取任务列表
  */
 export async function getTasks(req: Request, res: Response) {
-  const userId = (req as { userId?: string }).userId
+  const userId = (req as AuthRequest).userId
   const { projectId, assigneeId, status, startDate, endDate } = req.query
+
+  // 获取当前用户信息
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isAdmin: true, departmentId: true }
+  })
 
   // 构建查询条件
   const where: Record<string, unknown> = {
@@ -43,22 +60,27 @@ export async function getTasks(req: Request, res: Response) {
 
   // 如果没有指定项目，只返回用户有权限的任务
   if (!projectId) {
-    where.OR = [
-      { assigneeId: userId },
-      { collaborators: { some: { userId } } },
-      { project: { members: { some: { userId } } } }
-    ]
+    if (currentUser?.isAdmin) {
+      // 系统管理员可以看到所有任务
+    } else {
+      where.OR = [
+        { assigneeId: userId },
+        { collaborators: { some: { userId } } },
+        { project: { members: { some: { userId } } } },
+        { project: { departmentId: currentUser?.departmentId } }
+      ]
+    }
   }
 
   const tasks = await prisma.task.findMany({
     where,
     include: {
       project: {
-        select: { id: true, name: true }
+        select: { id: true, name: true, departmentId: true, department: { select: { id: true, name: true } } }
       },
       category: true,
       assignee: {
-        select: { id: true, nickname: true, avatar: true }
+        select: userSelectWithDept
       },
       creator: {
         select: { id: true, nickname: true }
@@ -66,7 +88,7 @@ export async function getTasks(req: Request, res: Response) {
       collaborators: {
         include: {
           user: {
-            select: { id: true, nickname: true, avatar: true }
+            select: userSelectWithDept
           }
         }
       }
@@ -85,25 +107,25 @@ export async function getTasks(req: Request, res: Response) {
  */
 export async function getTaskById(req: Request, res: Response) {
   const { id } = req.params
-  const userId = (req as { userId?: string }).userId
+  const userId = (req as AuthRequest).userId
 
   const task = await prisma.task.findFirst({
     where: { id, deletedAt: null },
     include: {
       project: {
-        select: { id: true, name: true, ownerId: true }
+        select: { id: true, name: true, ownerId: true, departmentId: true, department: { select: { id: true, name: true } } }
       },
       category: true,
       assignee: {
-        select: { id: true, nickname: true, avatar: true }
+        select: userSelectWithDept
       },
       creator: {
-        select: { id: true, nickname: true }
+        select: { id: true, nickname: true, department: { select: { id: true, name: true } } }
       },
       collaborators: {
         include: {
           user: {
-            select: { id: true, nickname: true, avatar: true }
+            select: userSelectWithDept
           }
         }
       },
@@ -111,7 +133,7 @@ export async function getTaskById(req: Request, res: Response) {
         where: { deletedAt: null },
         include: {
           user: {
-            select: { id: true, nickname: true, avatar: true }
+            select: { id: true, nickname: true, avatar: true, department: { select: { id: true, name: true } } }
           }
         },
         orderBy: { createdAt: 'desc' }
@@ -119,7 +141,7 @@ export async function getTaskById(req: Request, res: Response) {
       attachments: {
         include: {
           uploader: {
-            select: { id: true, nickname: true }
+            select: { id: true, nickname: true, department: { select: { id: true, name: true } } }
           }
         }
       }

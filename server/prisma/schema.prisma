@@ -12,6 +12,23 @@ datasource db {
 
 // ==================== 数据模型 ====================
 
+// 部门表
+model Department {
+  id          String   @id @default(uuid())
+  name        String   @unique // 部门名称唯一
+  description String?
+  adminId     String   @unique // 部门管理员（一对一）
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联
+  admin    User        @relation("DepartmentAdmin", fields: [adminId], references: [id], onDelete: Cascade)
+  members  User[]      @relation("DepartmentMember")
+  projects Project[]
+
+  @@index([name])
+}
+
 // 用户表
 model User {
   id        String   @id @default(uuid())
@@ -22,10 +39,13 @@ model User {
   bio       String?
   isAdmin   Boolean  @default(false)
   isBanned  Boolean  @default(false)
+  departmentId String? // 所属部门（可为空，兼容系统管理员）
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // 关联
+  department        Department?  @relation("DepartmentMember", fields: [departmentId], references: [id])
+  managedDepartment Department?  @relation("DepartmentAdmin") // 管理的部门（如果有）
   securityAnswers SecurityAnswer[]
   ownedProjects   Project[]         @relation("ProjectOwner")
   projectMembers  ProjectMember[]
@@ -40,6 +60,8 @@ model User {
   auditLogs       AuditLog[]
   pushSubscriptions PushSubscription[]
   taskTemplates   TaskTemplate[]
+
+  @@index([departmentId])
 }
 
 // 安全答案表
@@ -63,18 +85,21 @@ model Project {
   cover       String?
   visibility  String   @default("PRIVATE") // PUBLIC, PRIVATE
   ownerId     String
+  departmentId String? // 所属部门（可为空，兼容迁移期）
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   deletedAt   DateTime?
 
   // 关联
   owner      User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  department Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   members    ProjectMember[]
   invites    ProjectInvite[]
   categories TaskCategory[]
   tasks      Task[]
 
   @@index([visibility])
+  @@index([departmentId])
 }
 
 // 项目成员表

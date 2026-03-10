@@ -40,12 +40,22 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">
             所属项目 <span class="text-red-500">*</span>
           </label>
-          <select v-model="form.projectId" class="input" required @change="handleProjectChange">
-            <option value="">请选择项目</option>
-            <option v-for="project in projects" :key="project.id" :value="project.id">
-              {{ project.name }}
-            </option>
-          </select>
+          <div class="flex gap-2">
+            <select v-model="form.projectId" class="input flex-1" required @change="handleProjectChange">
+              <option value="">请选择项目</option>
+              <option v-for="project in projects" :key="project.id" :value="project.id">
+                {{ project.name }}
+              </option>
+            </select>
+            <button
+              type="button"
+              @click="showQuickCreateProject = true"
+              class="px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              title="新建项目"
+            >
+              <Plus class="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <!-- 任务描述 -->
@@ -252,6 +262,13 @@
         @close="showTemplateDialog = false"
         @select="applyTemplate"
       />
+
+      <!-- 快速创建项目对话框 -->
+      <QuickCreateProjectDialog
+        v-if="showQuickCreateProject"
+        @close="showQuickCreateProject = false"
+        @saved="handleProjectCreated"
+      />
     </div>
   </div>
 </template>
@@ -261,7 +278,7 @@
  * 中集智历 - 任务表单组件
  */
 import { ref, reactive, computed, watch, onMounted } from 'vue'
-import { X, FileText } from 'lucide-vue-next'
+import { X, FileText, Plus } from 'lucide-vue-next'
 import { useProjectStore } from '@/stores/project'
 import { getProjectMembers } from '@/api/project'
 import { getTaskCategories, createTask, updateTask, getTask, getAllTags } from '@/api/task'
@@ -270,6 +287,7 @@ import { formatDateTime } from '@/utils/date'
 import { devLog } from '@/utils/logger'
 import { getTagColorClasses } from '@/utils/tagColor'
 import TaskTemplateDialog from './TaskTemplateDialog.vue'
+import QuickCreateProjectDialog from '@/components/project/QuickCreateProjectDialog.vue'
 import type { TaskCategory, Reminder, Repeat, TaskTemplate } from '@/types/task'
 import type { ProjectMember } from '@/types/project'
 
@@ -293,6 +311,7 @@ const categories = ref<TaskCategory[]>([])
 const availableTags = ref<string[]>([])
 const newTagInput = ref('')
 const showTemplateDialog = ref(false)
+const showQuickCreateProject = ref(false)
 
 // 表单数据
 const form = reactive({
@@ -454,6 +473,14 @@ function applyTemplate(template: TaskTemplate) {
   if (template.categoryId) {
     form.categoryId = template.categoryId
   }
+}
+
+// 处理快速创建项目成功
+async function handleProjectCreated(project: { id: string; name: string }) {
+  showQuickCreateProject.value = false
+  // 自动选中新项目
+  form.projectId = project.id
+  await handleProjectChange()
 }
 
 // 保存为模板

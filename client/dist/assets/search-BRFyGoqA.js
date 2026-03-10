@@ -1,0 +1,1 @@
+import{b as r}from"./index-C06-2NE8.js";async function s(e){const t=new URLSearchParams;return t.append("keyword",e.keyword),e.types&&t.append("types",e.types),(await r(`/search?${t.toString()}`)).data}export{s as g};

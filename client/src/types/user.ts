@@ -2,6 +2,18 @@
  * 中集智历 - 用户类型定义
  */
 
+// 部门信息
+export interface Department {
+  id: string
+  name: string
+  description?: string
+  adminId?: string
+  admin?: User
+  memberCount?: number
+  projectCount?: number
+  createdAt: string
+}
+
 // 用户基础信息
 export interface User {
   id: string
@@ -11,6 +23,10 @@ export interface User {
   bio: string | null
   isAdmin: boolean
   isBanned: boolean
+  isDepartmentAdmin?: boolean
+  departmentId?: string
+  department?: Department
+  managedDepartment?: Department
   createdAt: string
   updatedAt: string
 }
@@ -28,6 +44,7 @@ export interface RegisterRequest {
   nickname: string
   securityQuestion: number
   securityAnswer: string
+  departmentId?: string
 }
 
 // 登录响应

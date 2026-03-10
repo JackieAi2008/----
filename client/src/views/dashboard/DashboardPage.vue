@@ -1,180 +1,108 @@
 <template>
-  <div class="space-y-6">
-    <!-- 欢迎信息 -->
-    <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 text-white">
-      <h1 class="text-2xl font-bold">欢迎回来，{{ authStore.user?.nickname || '用户' }}！</h1>
-      <p class="text-blue-100 mt-1">今天是 {{ todayStr }}，{{ greetingText }}</p>
+  <div class="space-y-6 animate-slide-up">
+    <!-- 欢迎信息 - 增强版 -->
+    <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 p-6 md:p-8 text-white shadow-lg">
+      <!-- 装饰背景 -->
+      <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4"></div>
+      <div class="absolute bottom-0 left-0 w-48 h-48 bg-blue-400/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/4"></div>
+
+      <div class="relative z-10">
+        <h1 class="text-2xl md:text-3xl font-bold">欢迎回来，{{ authStore.user?.nickname || '用户' }}！</h1>
+        <p class="text-blue-100 mt-2 text-sm md:text-base">今天是 {{ todayStr }}，{{ greetingText }}</p>
+      </div>
     </div>
 
-    <!-- 统计卡片 -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- 统计卡片（可展开） -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
       <!-- 今日待办 -->
-      <div class="bg-white rounded-lg border border-gray-200 p-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm text-gray-500">今日待办</p>
-            <p class="text-3xl font-bold text-gray-800 mt-1">{{ dashboard.todayTasks.length }}</p>
-          </div>
-          <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-            <Calendar class="w-6 h-6 text-blue-600" />
-          </div>
-        </div>
-        <router-link to="/calendar" class="text-sm text-blue-600 hover:text-blue-700 mt-2 inline-block">
-          查看日历 →
-        </router-link>
-      </div>
+      <ExpandableStatCard
+        ref="todayCardRef"
+        title="今日待办"
+        :count="dashboard.todayTasks.length"
+        :icon="Calendar"
+        icon-bg-class="bg-blue-100"
+        icon-class="text-blue-600"
+        :items="todayTaskItems"
+        empty-text="今日无待办任务"
+        @toggle="handleCardToggle('today')"
+        @item-click="goToTask"
+        @view-all="goToCalendar"
+      />
 
       <!-- 逾期任务 -->
-      <div class="bg-white rounded-lg border border-gray-200 p-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm text-gray-500">逾期任务</p>
-            <p class="text-3xl font-bold text-red-600 mt-1">{{ dashboard.overdueTasks.length }}</p>
-          </div>
-          <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-            <AlertCircle class="w-6 h-6 text-red-600" />
-          </div>
-        </div>
-        <span v-if="dashboard.overdueTasks.length > 0" class="text-sm text-red-600 mt-2 inline-block">
-          需要尽快处理
-        </span>
-      </div>
+      <ExpandableStatCard
+        ref="overdueCardRef"
+        title="逾期任务"
+        :count="dashboard.overdueTasks.length"
+        :icon="AlertCircle"
+        icon-bg-class="bg-red-100"
+        icon-class="text-red-600"
+        count-class="text-red-600"
+        :items="overdueTaskItems"
+        empty-text="没有逾期任务"
+        @toggle="handleCardToggle('overdue')"
+        @item-click="goToTask"
+        @view-all="goToCalendar"
+      />
 
       <!-- 本周任务 -->
-      <div class="bg-white rounded-lg border border-gray-200 p-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm text-gray-500">本周任务</p>
-            <p class="text-3xl font-bold text-gray-800 mt-1">{{ dashboard.weekTasksCount }}</p>
-          </div>
-          <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-            <ListTodo class="w-6 h-6 text-green-600" />
-          </div>
-        </div>
-        <span class="text-sm text-gray-500 mt-2 inline-block">
-          本月完成率 {{ dashboard.monthStats.completionRate }}%
-        </span>
-      </div>
+      <ExpandableStatCard
+        ref="weekCardRef"
+        title="本周任务"
+        :count="dashboard.weekTasksCount"
+        :icon="ListTodo"
+        icon-bg-class="bg-green-100"
+        icon-class="text-green-600"
+        :items="weekTaskItems"
+        :empty-text="`本月完成率 ${dashboard.monthStats.completionRate}%`"
+        @toggle="handleCardToggle('week')"
+        @item-click="goToTask"
+        @view-all="goToCalendar"
+      />
 
       <!-- 参与项目 -->
-      <div class="bg-white rounded-lg border border-gray-200 p-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm text-gray-500">参与项目</p>
-            <p class="text-3xl font-bold text-gray-800 mt-1">{{ dashboard.projectCount }}</p>
-          </div>
-          <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-            <FolderKanban class="w-6 h-6 text-purple-600" />
-          </div>
-        </div>
-        <router-link to="/projects" class="text-sm text-blue-600 hover:text-blue-700 mt-2 inline-block">
-          查看项目 →
-        </router-link>
-      </div>
+      <ExpandableStatCard
+        ref="projectCardRef"
+        title="参与项目"
+        :count="dashboard.projectCount"
+        :icon="FolderKanban"
+        icon-bg-class="bg-purple-100"
+        icon-class="text-purple-600"
+        :items="projectItems"
+        empty-text="暂无项目"
+        @toggle="handleCardToggle('project')"
+        @item-click="handleProjectItemClick"
+        @view-all="goToProjects"
+      />
     </div>
 
-    <!-- 任务列表区域 -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- 今日待办 -->
-      <div class="bg-white rounded-lg border border-gray-200">
-        <div class="p-4 border-b border-gray-200">
-          <h2 class="text-lg font-semibold text-gray-800">今日待办</h2>
-        </div>
-        <div class="p-4">
-          <div v-if="loading" class="text-center py-8 text-gray-500">加载中...</div>
-          <div v-else-if="dashboard.todayTasks.length === 0" class="text-center py-8 text-gray-500">
-            <CheckCircle class="w-12 h-12 text-green-500 mx-auto mb-2" />
-            <p>今日无待办任务</p>
-          </div>
-          <ul v-else class="space-y-3">
-            <li
-              v-for="task in dashboard.todayTasks"
-              :key="task.id"
-              class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
-              @click="goToTask(task.id)"
-            >
-              <div
-                class="w-3 h-3 rounded-full flex-shrink-0"
-                :style="{ backgroundColor: task.category?.color || '#3B82F6' }"
-              ></div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-800 truncate">{{ task.title }}</p>
-                <p class="text-xs text-gray-500">{{ task.project?.name }}</p>
-              </div>
-              <span
-                class="px-2 py-1 text-xs rounded-full"
-                :class="getPriorityClass(task.priority)"
-              >
-                {{ getPriorityText(task.priority) }}
-              </span>
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <!-- 逾期任务 -->
-      <div class="bg-white rounded-lg border border-gray-200">
-        <div class="p-4 border-b border-gray-200">
-          <h2 class="text-lg font-semibold text-gray-800">逾期任务</h2>
-        </div>
-        <div class="p-4">
-          <div v-if="loading" class="text-center py-8 text-gray-500">加载中...</div>
-          <div v-else-if="dashboard.overdueTasks.length === 0" class="text-center py-8 text-gray-500">
-            <CheckCircle class="w-12 h-12 text-green-500 mx-auto mb-2" />
-            <p>没有逾期任务</p>
-          </div>
-          <ul v-else class="space-y-3">
-            <li
-              v-for="task in dashboard.overdueTasks"
-              :key="task.id"
-              class="flex items-center gap-3 p-3 bg-red-50 rounded-lg cursor-pointer hover:bg-red-100"
-              @click="goToTask(task.id)"
-            >
-              <div
-                class="w-3 h-3 rounded-full flex-shrink-0"
-                :style="{ backgroundColor: task.category?.color || '#EF4444' }"
-              ></div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-800 truncate">{{ task.title }}</p>
-                <p class="text-xs text-red-600">
-                  截止: {{ formatDate(task.dueDate) }}
-                </p>
-              </div>
-              <span class="text-xs text-red-600">
-                {{ getOverdueDays(task.dueDate) }}天前
-              </span>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <!-- 即将到期 & 最近项目 -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- 即将到期 & 最近项目详情 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
       <!-- 即将到期 -->
-      <div class="bg-white rounded-lg border border-gray-200">
-        <div class="p-4 border-b border-gray-200">
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-card hover:shadow-card-hover transition-shadow duration-300">
+        <div class="p-4 md:p-5 border-b border-gray-100">
           <h2 class="text-lg font-semibold text-gray-800">即将到期（3天内）</h2>
         </div>
-        <div class="p-4">
-          <div v-if="dashboard.upcomingTasks.length === 0" class="text-center py-8 text-gray-500">
-            <Calendar class="w-12 h-12 text-gray-300 mx-auto mb-2" />
-            <p>暂无即将到期的任务</p>
+        <div class="p-4 md:p-5">
+          <div v-if="loading" class="text-center py-8 text-gray-500">加载中...</div>
+          <div v-else-if="dashboard.upcomingTasks.length === 0" class="text-center py-8 text-gray-500">
+            <Calendar class="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p class="text-sm">暂无即将到期的任务</p>
           </div>
-          <ul v-else class="space-y-3">
+          <ul v-else class="space-y-2">
             <li
               v-for="task in dashboard.upcomingTasks"
               :key="task.id"
-              class="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg cursor-pointer hover:bg-yellow-100"
+              class="flex items-center gap-3 p-3 bg-amber-50/80 rounded-xl cursor-pointer hover:bg-amber-100/80 transition-colors duration-200"
               @click="goToTask(task.id)"
             >
               <div
-                class="w-3 h-3 rounded-full flex-shrink-0"
+                class="w-3 h-3 rounded-full flex-shrink-0 ring-2 ring-amber-200"
                 :style="{ backgroundColor: task.category?.color || '#F59E0B' }"
               ></div>
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-800 truncate">{{ task.title }}</p>
-                <p class="text-xs text-yellow-600">
+                <p class="text-xs text-amber-600 mt-0.5">
                   截止: {{ formatDate(task.dueDate) }}
                 </p>
               </div>
@@ -184,36 +112,37 @@
       </div>
 
       <!-- 最近项目 -->
-      <div class="bg-white rounded-lg border border-gray-200">
-        <div class="p-4 border-b border-gray-200">
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-card hover:shadow-card-hover transition-shadow duration-300">
+        <div class="p-4 md:p-5 border-b border-gray-100">
           <h2 class="text-lg font-semibold text-gray-800">最近项目</h2>
         </div>
-        <div class="p-4">
-          <div v-if="dashboard.recentProjects.length === 0" class="text-center py-8 text-gray-500">
-            <FolderKanban class="w-12 h-12 text-gray-300 mx-auto mb-2" />
-            <p>暂无项目</p>
-            <router-link to="/projects" class="text-blue-600 hover:text-blue-700 mt-2 inline-block">
+        <div class="p-4 md:p-5">
+          <div v-if="loading" class="text-center py-8 text-gray-500">加载中...</div>
+          <div v-else-if="dashboard.recentProjects.length === 0" class="text-center py-8 text-gray-500">
+            <FolderKanban class="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p class="text-sm">暂无项目</p>
+            <router-link to="/projects" class="text-blue-600 hover:text-blue-700 mt-2 inline-block text-sm font-medium">
               创建第一个项目
             </router-link>
           </div>
-          <ul v-else class="space-y-3">
+          <ul v-else class="space-y-2">
             <li
               v-for="project in dashboard.recentProjects"
               :key="project.id"
-              class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
+              class="flex items-center gap-3 p-3 bg-gray-50/80 rounded-xl cursor-pointer hover:bg-gray-100/80 transition-colors duration-200"
               @click="goToProject(project.id)"
             >
-              <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
                 <FolderKanban class="w-5 h-5 text-white" />
               </div>
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-800 truncate">{{ project.name }}</p>
-                <p class="text-xs text-gray-500">
+                <p class="text-xs text-gray-500 mt-0.5">
                   {{ project._count?.tasks || 0 }} 个任务
                 </p>
               </div>
               <span
-                class="px-2 py-1 text-xs rounded-full"
+                class="px-2.5 py-1 text-xs rounded-lg font-medium"
                 :class="project.visibility === 'PUBLIC' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
               >
                 {{ project.visibility === 'PUBLIC' ? '公开' : '私密' }}
@@ -232,14 +161,24 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Calendar, AlertCircle, ListTodo, FolderKanban, CheckCircle } from 'lucide-vue-next'
+import { Calendar, AlertCircle, ListTodo, FolderKanban } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { getDashboard, type DashboardData } from '@/api/dashboard'
 import { formatDate as formatDateUtil } from '@/utils/date'
 import { devLog } from '@/utils/logger'
+import ExpandableStatCard, { type StatCardItem } from '@/components/dashboard/ExpandableStatCard.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
+
+// 卡片引用（用于手风琴效果）
+const todayCardRef = ref<InstanceType<typeof ExpandableStatCard>>()
+const overdueCardRef = ref<InstanceType<typeof ExpandableStatCard>>()
+const weekCardRef = ref<InstanceType<typeof ExpandableStatCard>>()
+const projectCardRef = ref<InstanceType<typeof ExpandableStatCard>>()
+
+// 当前展开的卡片
+const expandedCard = ref<string | null>(null)
 
 // 状态
 const loading = ref(true)
@@ -268,6 +207,49 @@ const greetingText = computed(() => {
   if (hour < 18) return '下午好，继续加油'
   return '晚上好，辛苦了'
 })
+
+// 转换为卡片项格式
+const todayTaskItems = computed<StatCardItem[]>(() =>
+  dashboard.value.todayTasks.map(task => ({
+    id: task.id,
+    title: task.title,
+    subtitle: task.project?.name,
+    color: task.category?.color || '#3B82F6',
+    badge: getPriorityText(task.priority),
+    badgeClass: getPriorityClass(task.priority)
+  }))
+)
+
+const overdueTaskItems = computed<StatCardItem[]>(() =>
+  dashboard.value.overdueTasks.map(task => ({
+    id: task.id,
+    title: task.title,
+    subtitle: `截止: ${formatDate(task.dueDate)}`,
+    color: task.category?.color || '#EF4444',
+    badge: `${getOverdueDays(task.dueDate)}天前`,
+    badgeClass: 'bg-red-100 text-red-700'
+  }))
+)
+
+const weekTaskItems = computed<StatCardItem[]>(() => {
+  // 本周任务数据来自 dashboard，但这里用 upcomingTasks 作为替代显示
+  return dashboard.value.upcomingTasks.slice(0, 3).map(task => ({
+    id: task.id,
+    title: task.title,
+    subtitle: task.project?.name,
+    color: task.category?.color || '#22C55E'
+  }))
+})
+
+const projectItems = computed<StatCardItem[]>(() =>
+  dashboard.value.recentProjects.map(project => ({
+    id: project.id,
+    title: project.name,
+    subtitle: `${project._count?.tasks || 0} 个任务`,
+    badge: project.visibility === 'PUBLIC' ? '公开' : '私密',
+    badgeClass: project.visibility === 'PUBLIC' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+  }))
+)
 
 // 方法
 function formatDate(dateStr: string): string {
@@ -300,12 +282,49 @@ function getPriorityText(priority: string): string {
   }
 }
 
-function goToTask(taskId: string) {
-  router.push(`/tasks/${taskId}`)
+function goToTask(taskId: string | StatCardItem) {
+  const id = typeof taskId === 'string' ? taskId : taskId.id
+  router.push(`/tasks/${id}`)
 }
 
 function goToProject(projectId: string) {
   router.push(`/projects/${projectId}`)
+}
+
+function goToCalendar() {
+  router.push('/calendar')
+}
+
+function goToProjects() {
+  router.push('/projects')
+}
+
+function handleProjectItemClick(item: StatCardItem) {
+  router.push(`/projects/${item.id}`)
+}
+
+// 手风琴效果：同一时间只能展开一个卡片
+function handleCardToggle(cardName: string) {
+  if (expandedCard.value === cardName) {
+    expandedCard.value = null
+    return
+  }
+
+  // 收起其他卡片
+  const cardRefs: Record<string, typeof todayCardRef> = {
+    today: todayCardRef,
+    overdue: overdueCardRef,
+    week: weekCardRef,
+    project: projectCardRef
+  }
+
+  Object.entries(cardRefs).forEach(([name, ref]) => {
+    if (name !== cardName && ref.value) {
+      ref.value.collapse()
+    }
+  })
+
+  expandedCard.value = cardName
 }
 
 async function fetchDashboard() {

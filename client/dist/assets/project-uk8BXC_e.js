@@ -1,6 +1,0 @@
-import{c as m}from"./createLucideIcon-CYNk11Ds.js";import{z as w,n as s,y as i}from"./vue-BWz_wWoQ.js";import{b as g,c as x,d as I,u as $,e as k}from"./project-ooYVv47f.js";/**
- * @license lucide-vue-next v0.312.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */const q=m("PlusIcon",[["path",{d:"M5 12h14",key:"1ays0h"}],["path",{d:"M12 5v14",key:"s699le"}]]),z=w("project",()=>{const o=s([]),c=s(null),r=s(!1),f=i(()=>o.value.length),v=i(()=>o.value.filter(e=>!e.deletedAt));async function d(){r.value=!0;try{const e=await g();return o.value=e,e}finally{r.value=!1}}async function p(e){r.value=!0;try{const t=await x(e);return c.value=t,t}finally{r.value=!1}}async function j(e){const t=await I(e);return o.value.push(t),t}async function P(e,t){var l;const a={...t,description:t.description??void 0,cover:t.cover??void 0},n=await $(e,a),u=o.value.findIndex(h=>h.id===e);return u!==-1&&(o.value[u]=n),((l=c.value)==null?void 0:l.id)===e&&(c.value=n),n}async function y(e){var t;await k(e),o.value=o.value.filter(a=>a.id!==e),((t=c.value)==null?void 0:t.id)===e&&(c.value=null)}return{projects:o,currentProject:c,loading:r,projectCount:f,activeProjects:v,fetchProjects:d,fetchProject:p,createProject:j,updateProject:P,deleteProject:y}});export{q as P,z as u};

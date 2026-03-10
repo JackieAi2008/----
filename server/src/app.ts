@@ -23,6 +23,7 @@ import searchRoutes from './routes/search.js'
 import pushRoutes from './routes/push.js'
 import tagRoutes from './routes/tags.js'
 import templateRoutes from './routes/templates.js'
+import departmentRoutes from './routes/departments.js'
 
 // 导入中间件
 import { errorHandler } from './middlewares/errorHandler.js'
@@ -60,6 +61,7 @@ app.use('/api/search', searchRoutes)
 app.use('/api/push', pushRoutes)
 app.use('/api/tags', tagRoutes)
 app.use('/api/templates', templateRoutes)
+app.use('/api/departments', departmentRoutes)
 
 // 健康检查
 app.get('/api/health', (_req, res) => {

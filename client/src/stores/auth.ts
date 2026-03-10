@@ -14,6 +14,10 @@ export const useAuthStore = defineStore('auth', () => {
   // 计算属性
   const isAuthenticated = computed(() => !!token.value)
   const isAdmin = computed(() => user.value?.isAdmin ?? false)
+  const isDepartmentAdmin = computed(() => user.value?.isDepartmentAdmin ?? false)
+  const departmentId = computed(() => user.value?.departmentId ?? null)
+  const department = computed(() => user.value?.department ?? null)
+  const managedDepartment = computed(() => user.value?.managedDepartment ?? null)
 
   // 登录
   async function login(email: string, password: string) {
@@ -31,6 +35,7 @@ export const useAuthStore = defineStore('auth', () => {
     nickname: string
     securityQuestion: number
     securityAnswer: string
+    departmentId?: string
   }) {
     const response = await authApi.register(data)
     token.value = response.token
@@ -74,6 +79,10 @@ export const useAuthStore = defineStore('auth', () => {
     token,
     isAuthenticated,
     isAdmin,
+    isDepartmentAdmin,
+    departmentId,
+    department,
+    managedDepartment,
     login,
     register,
     logout,

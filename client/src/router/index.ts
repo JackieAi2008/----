@@ -3,6 +3,7 @@
  */
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 // 路由配置
 const routes: RouteRecordRaw[] = [
@@ -92,6 +93,18 @@ const routes: RouteRecordRaw[] = [
         name: 'Settings',
         component: () => import('@/views/settings/SettingsPage.vue'),
         meta: { title: '设置' }
+      },
+      {
+        path: 'admin/departments',
+        name: 'DepartmentManage',
+        component: () => import('@/views/admin/DepartmentManage.vue'),
+        meta: { title: '部门管理', requiresAdmin: true }
+      },
+      {
+        path: 'my-department',
+        name: 'MyDepartment',
+        component: () => import('@/views/department/MyDepartment.vue'),
+        meta: { title: '我的部门', requiresDepartmentAdmin: true }
       }
     ]
   }
@@ -104,7 +117,7 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   // 获取token
   const token = localStorage.getItem('token')
 
@@ -118,6 +131,32 @@ router.beforeEach((to, _from, next) => {
   if ((to.path === '/login' || to.path === '/register') && token) {
     next('/')
     return
+  }
+
+  // 检查部门管理员权限
+  if (to.meta.requiresDepartmentAdmin) {
+    const authStore = useAuthStore()
+    // 如果 store 还没有用户信息，尝试获取
+    if (!authStore.user && token) {
+      await authStore.fetchCurrentUser()
+    }
+    // 检查是否是系统管理员或部门管理员
+    if (!authStore.isAdmin && !authStore.isDepartmentAdmin) {
+      next('/dashboard')
+      return
+    }
+  }
+
+  // 检查系统管理员权限
+  if (to.meta.requiresAdmin) {
+    const authStore = useAuthStore()
+    if (!authStore.user && token) {
+      await authStore.fetchCurrentUser()
+    }
+    if (!authStore.isAdmin) {
+      next('/dashboard')
+      return
+    }
   }
 
   next()

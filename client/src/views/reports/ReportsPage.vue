@@ -87,22 +87,61 @@
 
     <template v-else>
       <!-- 统计卡片 -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white rounded-lg border border-gray-200 p-4">
-          <div class="text-sm text-gray-500">总任务数</div>
-          <div class="text-3xl font-bold text-gray-800 mt-1">{{ stats.total }}</div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <!-- 总任务数 -->
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white shadow-lg shadow-blue-200">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-blue-100 text-sm font-medium">总任务数</p>
+              <p class="text-4xl font-bold mt-2">{{ stats.total }}</p>
+              <p class="text-blue-200 text-xs mt-1">选定时间范围内</p>
+            </div>
+            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+              <ClipboardList class="w-7 h-7" />
+            </div>
+          </div>
         </div>
-        <div class="bg-white rounded-lg border border-gray-200 p-4">
-          <div class="text-sm text-gray-500">已完成</div>
-          <div class="text-3xl font-bold text-green-600 mt-1">{{ stats.done }}</div>
+
+        <!-- 已完成 -->
+        <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg shadow-green-200">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-green-100 text-sm font-medium">已完成</p>
+              <p class="text-4xl font-bold mt-2">{{ stats.done }}</p>
+              <p class="text-green-200 text-xs mt-1">完成率 {{ completionRate }}%</p>
+            </div>
+            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+              <CheckCircle class="w-7 h-7" />
+            </div>
+          </div>
         </div>
-        <div class="bg-white rounded-lg border border-gray-200 p-4">
-          <div class="text-sm text-gray-500">进行中</div>
-          <div class="text-3xl font-bold text-blue-600 mt-1">{{ stats.inProgress }}</div>
+
+        <!-- 进行中 -->
+        <div class="bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl p-5 text-white shadow-lg shadow-amber-200">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-amber-100 text-sm font-medium">进行中</p>
+              <p class="text-4xl font-bold mt-2">{{ stats.inProgress }}</p>
+              <p class="text-amber-200 text-xs mt-1">正在处理</p>
+            </div>
+            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+              <Clock class="w-7 h-7" />
+            </div>
+          </div>
         </div>
-        <div class="bg-white rounded-lg border border-gray-200 p-4">
-          <div class="text-sm text-gray-500">逾期任务</div>
-          <div class="text-3xl font-bold text-red-600 mt-1">{{ stats.overdue }}</div>
+
+        <!-- 逾期任务 -->
+        <div class="bg-gradient-to-br from-red-500 to-rose-600 rounded-xl p-5 text-white shadow-lg shadow-red-200">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-red-100 text-sm font-medium">逾期任务</p>
+              <p class="text-4xl font-bold mt-2">{{ stats.overdue }}</p>
+              <p class="text-red-200 text-xs mt-1">需要关注</p>
+            </div>
+            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+              <AlertTriangle class="w-7 h-7" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -204,19 +243,65 @@
       </div>
 
       <!-- 完成趋势 -->
-      <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">完成趋势</h3>
-        <div class="h-48 flex items-end justify-around gap-2">
-          <div
-            v-for="(day, index) in trendData"
-            :key="index"
-            class="flex flex-col items-center gap-1"
-          >
-            <div
-              class="w-8 bg-blue-500 rounded-t"
-              :style="{ height: getBarHeight(day.count) + 'px' }"
-            ></div>
-            <span class="text-xs text-gray-500">{{ day.label }}</span>
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <TrendingUp class="w-5 h-5 text-green-600" />
+            完成趋势
+          </h3>
+          <div class="flex items-center gap-4 text-sm">
+            <span class="flex items-center gap-1.5">
+              <div class="w-3 h-3 rounded-full bg-gradient-to-t from-blue-500 to-blue-400"></div>
+              <span class="text-gray-500">完成任务数</span>
+            </span>
+          </div>
+        </div>
+
+        <div v-if="trendData.length === 0 || trendData.every(d => d.count === 0)" class="text-center py-12">
+          <BarChart3 class="w-16 h-16 text-gray-200 mx-auto mb-3" />
+          <p class="text-gray-400">暂无趋势数据</p>
+          <p class="text-gray-300 text-sm mt-1">完成任务后将在此显示趋势</p>
+        </div>
+
+        <div v-else class="relative">
+          <!-- Y轴刻度 -->
+          <div class="absolute left-0 top-0 bottom-8 w-10 flex flex-col justify-between text-xs text-gray-400">
+            <span>{{ maxTrendValue }}</span>
+            <span>{{ Math.round(maxTrendValue / 2) }}</span>
+            <span>0</span>
+          </div>
+
+          <!-- 图表区域 -->
+          <div class="ml-12">
+            <!-- 网格线 -->
+            <div class="absolute left-12 right-0 top-0 h-40 flex flex-col justify-between pointer-events-none">
+              <div class="border-b border-gray-100"></div>
+              <div class="border-b border-gray-100"></div>
+              <div class="border-b border-gray-100"></div>
+            </div>
+
+            <!-- 柱状图 -->
+            <div class="h-40 flex items-end justify-around gap-2 relative">
+              <div
+                v-for="(day, index) in trendData"
+                :key="index"
+                class="flex flex-col items-center group flex-1"
+              >
+                <!-- 数值提示 -->
+                <div class="opacity-0 group-hover:opacity-100 transition-opacity mb-1 bg-gray-800 text-white text-xs px-2 py-1 rounded">
+                  {{ day.count }} 项
+                </div>
+                <!-- 柱子 -->
+                <div
+                  class="w-full max-w-[40px] rounded-t-lg transition-all duration-300 group-hover:opacity-80 relative overflow-hidden"
+                  :class="day.count > 0 ? 'bg-gradient-to-t from-blue-600 to-blue-400 shadow-md shadow-blue-200' : 'bg-gray-200'"
+                  :style="{ height: getBarHeight(day.count) + 'px' }"
+                >
+                  <div v-if="day.count > 0" class="absolute top-0 left-0 right-0 h-1 bg-white/30 rounded-t-lg"></div>
+                </div>
+                <span class="text-xs text-gray-500 mt-2 font-medium">{{ day.label }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -274,7 +359,15 @@
 /**
  * 中集智历 - 总结归档页面
  */
-import { ref, onMounted, watch, reactive } from 'vue'
+import { ref, computed, onMounted, watch, reactive } from 'vue'
+import {
+  ClipboardList,
+  CheckCircle,
+  Clock,
+  AlertTriangle,
+  TrendingUp,
+  BarChart3
+} from 'lucide-vue-next'
 import { getDashboard, getWorkStats } from '@/api/dashboard'
 import { downloadICS, downloadExcel, downloadPDF } from '@/api/export'
 import { useToast } from '@/composables/useToast'
@@ -322,6 +415,17 @@ const projectStats = ref<Array<{ projectId: string; projectName: string; count: 
 
 const trendData = ref<Array<{ label: string; count: number }>>([])
 
+// 计算属性
+const completionRate = computed(() => {
+  if (stats.value.total === 0) return 0
+  return Math.round((stats.value.done / stats.value.total) * 100)
+})
+
+const maxTrendValue = computed(() => {
+  const max = Math.max(...trendData.value.map(d => d.count), 1)
+  return Math.ceil(max / 5) * 5
+})
+
 // 计算状态百分比
 function getStatusPercent(status: string): number {
   const total = stats.value.total || 1
@@ -337,8 +441,9 @@ function getProjectPercent(count: number): number {
 
 // 计算柱状图高度
 function getBarHeight(count: number): number {
-  const max = Math.max(...trendData.value.map(d => d.count), 1)
-  return Math.round((count / max) * 140)
+  if (count === 0) return 4
+  const max = maxTrendValue.value || 1
+  return Math.max(4, Math.round((count / max) * 140))
 }
 
 // 获取日期范围

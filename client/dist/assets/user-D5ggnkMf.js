@@ -1,1 +1,0 @@
-import{g as e,a as r}from"./request-pCh6WMNh.js";async function o(s,a){return(await r(`/users/${s}`,a)).data}async function p(s){return(await e("/users/search",{params:{keyword:s}})).data??[]}export{p as s,o as u};

@@ -4,24 +4,47 @@
 import { Request, Response } from 'express'
 import prisma from '../config/database.js'
 import { ApiError } from '../middlewares/errorHandler.js'
+import { AuthRequest } from '../middlewares/auth.js'
 
 /**
  * 获取当前用户的项目列表
+ * - 系统管理员：可以看到所有项目
+ * - 部门管理员/普通成员：本部门项目 + 被邀请的项目
  */
 export async function getProjects(req: Request, res: Response) {
-  const userId = (req as { userId?: string }).userId
+  const userId = (req as AuthRequest).userId
 
-  const projects = await prisma.project.findMany({
-    where: {
+  // 获取当前用户信息
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isAdmin: true, departmentId: true }
+  })
+
+  let whereClause: object
+
+  if (currentUser?.isAdmin) {
+    // 系统管理员：所有未删除的项目
+    whereClause = { deletedAt: null }
+  } else {
+    // 普通用户：本部门项目 + 被邀请的项目
+    whereClause = {
       deletedAt: null,
       OR: [
-        { ownerId: userId },
-        { members: { some: { userId } } }
+        { departmentId: currentUser?.departmentId }, // 本部门项目
+        { ownerId: userId }, // 自己创建的项目
+        { members: { some: { userId } } } // 被邀请的项目
       ]
-    },
+    }
+  }
+
+  const projects = await prisma.project.findMany({
+    where: whereClause,
     include: {
       owner: {
         select: { id: true, nickname: true, avatar: true }
+      },
+      department: {
+        select: { id: true, name: true }
       },
       _count: {
         select: { members: true, tasks: true }
@@ -49,6 +72,9 @@ export async function getPublicProjects(_req: Request, res: Response) {
       owner: {
         select: { id: true, nickname: true, avatar: true }
       },
+      department: {
+        select: { id: true, name: true }
+      },
       _count: {
         select: { members: true, tasks: true }
       }
@@ -67,18 +93,27 @@ export async function getPublicProjects(_req: Request, res: Response) {
  */
 export async function getProjectById(req: Request, res: Response) {
   const { id } = req.params
-  const userId = (req as { userId?: string }).userId
+  const userId = (req as AuthRequest).userId
+
+  // 获取当前用户信息
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isAdmin: true, departmentId: true }
+  })
 
   const project = await prisma.project.findFirst({
     where: { id, deletedAt: null },
     include: {
       owner: {
-        select: { id: true, nickname: true, avatar: true }
+        select: { id: true, nickname: true, avatar: true, departmentId: true, department: { select: { id: true, name: true } } }
+      },
+      department: {
+        select: { id: true, name: true }
       },
       members: {
         include: {
           user: {
-            select: { id: true, nickname: true, avatar: true }
+            select: { id: true, nickname: true, avatar: true, departmentId: true, department: { select: { id: true, name: true } } }
           }
         }
       }
@@ -92,7 +127,10 @@ export async function getProjectById(req: Request, res: Response) {
   // 检查访问权限
   const isMember = project.members.some(m => m.userId === userId)
   const isOwner = project.ownerId === userId
-  if (project.visibility === 'PRIVATE' && !isMember && !isOwner) {
+  const isSameDepartment = currentUser?.departmentId && project.departmentId === currentUser.departmentId
+  const canAccess = currentUser?.isAdmin || isMember || isOwner || isSameDepartment || project.visibility === 'PUBLIC'
+
+  if (!canAccess) {
     throw new ApiError(403, '无权访问该项目')
   }
 
@@ -104,10 +142,17 @@ export async function getProjectById(req: Request, res: Response) {
 
 /**
  * 创建项目
+ * - 自动设置 departmentId 为创建者的部门
  */
 export async function createProject(req: Request, res: Response) {
-  const userId = (req as { userId?: string }).userId
+  const userId = (req as AuthRequest).userId
   const { name, description, visibility } = req.body
+
+  // 获取创建者的部门
+  const creator = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { departmentId: true }
+  })
 
   // 创建项目
   const project = await prisma.project.create({
@@ -116,6 +161,7 @@ export async function createProject(req: Request, res: Response) {
       description,
       visibility,
       ownerId: userId!,
+      departmentId: creator?.departmentId,
       members: {
         create: {
           userId: userId!,
@@ -126,6 +172,9 @@ export async function createProject(req: Request, res: Response) {
     include: {
       owner: {
         select: { id: true, nickname: true, avatar: true }
+      },
+      department: {
+        select: { id: true, name: true }
       }
     }
   })
@@ -138,23 +187,36 @@ export async function createProject(req: Request, res: Response) {
 
 /**
  * 更新项目
+ * - 项目负责人、部门管理员、系统管理员可以修改
  */
 export async function updateProject(req: Request, res: Response) {
   const { id } = req.params
-  const userId = (req as { userId?: string }).userId
+  const userId = (req as AuthRequest).userId
   const { name, description, cover, visibility } = req.body
 
-  // 检查权限
+  // 获取项目
   const project = await prisma.project.findFirst({
-    where: { id, deletedAt: null }
+    where: { id, deletedAt: null },
+    include: { department: true }
   })
 
   if (!project) {
     throw new ApiError(404, '项目不存在')
   }
 
-  if (project.ownerId !== userId) {
-    throw new ApiError(403, '只有项目负责人可以修改项目')
+  // 检查权限
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isAdmin: true, departmentId: true }
+  })
+
+  const isOwner = project.ownerId === userId
+  const isDeptAdmin = project.departmentId && await prisma.department.findFirst({
+    where: { id: project.departmentId, adminId: userId }
+  })
+
+  if (!isOwner && !isDeptAdmin && !currentUser?.isAdmin) {
+    throw new ApiError(403, '只有项目负责人或部门管理员可以修改项目')
   }
 
   const updatedProject = await prisma.project.update({
@@ -163,6 +225,9 @@ export async function updateProject(req: Request, res: Response) {
     include: {
       owner: {
         select: { id: true, nickname: true, avatar: true }
+      },
+      department: {
+        select: { id: true, name: true }
       }
     }
   })
@@ -175,10 +240,11 @@ export async function updateProject(req: Request, res: Response) {
 
 /**
  * 删除项目（软删除）
+ * - 项目负责人、部门管理员、系统管理员可以删除
  */
 export async function deleteProject(req: Request, res: Response) {
   const { id } = req.params
-  const userId = (req as { userId?: string }).userId
+  const userId = (req as AuthRequest).userId
 
   const project = await prisma.project.findFirst({
     where: { id, deletedAt: null }
@@ -188,8 +254,18 @@ export async function deleteProject(req: Request, res: Response) {
     throw new ApiError(404, '项目不存在')
   }
 
-  if (project.ownerId !== userId) {
-    throw new ApiError(403, '只有项目负责人可以删除项目')
+  // 检查权限
+  const isOwner = project.ownerId === userId
+  const isDeptAdmin = project.departmentId && await prisma.department.findFirst({
+    where: { id: project.departmentId, adminId: userId }
+  })
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isAdmin: true }
+  })
+
+  if (!isOwner && !isDeptAdmin && !currentUser?.isAdmin) {
+    throw new ApiError(403, '只有项目负责人或部门管理员可以删除项目')
   }
 
   await prisma.project.update({
@@ -213,7 +289,14 @@ export async function getProjectMembers(req: Request, res: Response) {
     where: { projectId: id },
     include: {
       user: {
-        select: { id: true, nickname: true, avatar: true, email: true }
+        select: {
+          id: true,
+          nickname: true,
+          avatar: true,
+          email: true,
+          departmentId: true,
+          department: { select: { id: true, name: true } }
+        }
       }
     }
   })
@@ -226,13 +309,14 @@ export async function getProjectMembers(req: Request, res: Response) {
 
 /**
  * 添加项目成员
+ * - 支持跨部门邀请
  */
 export async function addMember(req: Request, res: Response) {
   const { id } = req.params
   const { userId: newMemberId } = req.body
-  const currentUserId = (req as { userId?: string }).userId
+  const currentUserId = (req as AuthRequest).userId
 
-  // 检查是否是项目负责人
+  // 获取项目
   const project = await prisma.project.findFirst({
     where: { id, deletedAt: null }
   })
@@ -241,8 +325,20 @@ export async function addMember(req: Request, res: Response) {
     throw new ApiError(404, '项目不存在')
   }
 
-  if (project.ownerId !== currentUserId) {
-    throw new ApiError(403, '只有项目负责人可以添加成员')
+  // 获取当前用户信息
+  const currentUser = await prisma.user.findUnique({
+    where: { id: currentUserId },
+    select: { isAdmin: true, departmentId: true }
+  })
+
+  // 检查是否是项目负责人或部门管理员
+  const isOwner = project.ownerId === currentUserId
+  const isDeptAdmin = project.departmentId && await prisma.department.findFirst({
+    where: { id: project.departmentId, adminId: currentUserId }
+  })
+
+  if (!isOwner && !isDeptAdmin && !currentUser?.isAdmin) {
+    throw new ApiError(403, '只有项目负责人或部门管理员可以添加成员')
   }
 
   // 检查用户是否已是成员
@@ -264,7 +360,12 @@ export async function addMember(req: Request, res: Response) {
     },
     include: {
       user: {
-        select: { id: true, nickname: true, avatar: true }
+        select: {
+          id: true,
+          nickname: true,
+          avatar: true,
+          department: { select: { id: true, name: true } }
+        }
       }
     }
   })
@@ -280,7 +381,7 @@ export async function addMember(req: Request, res: Response) {
  */
 export async function removeMember(req: Request, res: Response) {
   const { id, userId: memberUserId } = req.params
-  const currentUserId = (req as { userId?: string }).userId
+  const currentUserId = (req as AuthRequest).userId
 
   const project = await prisma.project.findFirst({
     where: { id, deletedAt: null }
@@ -295,8 +396,20 @@ export async function removeMember(req: Request, res: Response) {
     throw new ApiError(400, '项目负责人不能被移除')
   }
 
-  // 只有负责人可以移除成员，或者成员自己退出
-  if (project.ownerId !== currentUserId && memberUserId !== currentUserId) {
+  // 获取当前用户信息
+  const currentUser = await prisma.user.findUnique({
+    where: { id: currentUserId },
+    select: { isAdmin: true }
+  })
+
+  // 检查是否是项目负责人或部门管理员
+  const isOwner = project.ownerId === currentUserId
+  const isDeptAdmin = project.departmentId && await prisma.department.findFirst({
+    where: { id: project.departmentId, adminId: currentUserId }
+  })
+
+  // 只有负责人/部门管理员可以移除成员，或者成员自己退出
+  if (!isOwner && !isDeptAdmin && !currentUser?.isAdmin && memberUserId !== currentUserId) {
     throw new ApiError(403, '无权移除该成员')
   }
 
@@ -314,11 +427,12 @@ export async function removeMember(req: Request, res: Response) {
 
 /**
  * 邀请用户加入项目
+ * - 项目负责人和部门管理员可以跨部门邀请
  */
 export async function inviteUser(req: Request, res: Response) {
   const { id } = req.params
   const { inviteeId } = req.body
-  const inviterId = (req as { userId?: string }).userId
+  const inviterId = (req as AuthRequest).userId
 
   // 检查项目
   const project = await prisma.project.findFirst({
@@ -329,6 +443,12 @@ export async function inviteUser(req: Request, res: Response) {
     throw new ApiError(404, '项目不存在')
   }
 
+  // 获取邀请人信息
+  const inviter = await prisma.user.findUnique({
+    where: { id: inviterId },
+    select: { isAdmin: true, departmentId: true }
+  })
+
   // 检查是否是项目成员
   const isMember = await prisma.projectMember.findUnique({
     where: {
@@ -336,7 +456,13 @@ export async function inviteUser(req: Request, res: Response) {
     }
   })
 
-  if (!isMember) {
+  // 部门管理员和项目负责人可以跨部门邀请
+  const isOwner = project.ownerId === inviterId
+  const isDeptAdmin = project.departmentId && await prisma.department.findFirst({
+    where: { id: project.departmentId, adminId: inviterId }
+  })
+
+  if (!isMember && !isOwner && !isDeptAdmin && !inviter?.isAdmin) {
     throw new ApiError(403, '只有项目成员可以邀请其他人')
   }
 
@@ -385,7 +511,7 @@ export async function inviteUser(req: Request, res: Response) {
  */
 export async function acceptInvite(req: Request, res: Response) {
   const { id } = req.params
-  const userId = (req as { userId?: string }).userId
+  const userId = (req as AuthRequest).userId
 
   const invite = await prisma.projectInvite.findFirst({
     where: {
@@ -425,7 +551,7 @@ export async function acceptInvite(req: Request, res: Response) {
  */
 export async function rejectInvite(req: Request, res: Response) {
   const { id } = req.params
-  const userId = (req as { userId?: string }).userId
+  const userId = (req as AuthRequest).userId
 
   const invite = await prisma.projectInvite.findFirst({
     where: {
@@ -454,7 +580,7 @@ export async function rejectInvite(req: Request, res: Response) {
  * 获取已删除的项目列表
  */
 export async function getDeletedProjects(req: Request, res: Response) {
-  const userId = (req as { userId?: string }).userId
+  const userId = (req as AuthRequest).userId
 
   // 计算30天前的日期
   const thirtyDaysAgo = new Date()
@@ -504,7 +630,7 @@ export async function getDeletedProjects(req: Request, res: Response) {
  */
 export async function restoreProject(req: Request, res: Response) {
   const { id } = req.params
-  const userId = (req as { userId?: string }).userId
+  const userId = (req as AuthRequest).userId
 
   const project = await prisma.project.findFirst({
     where: { id }
@@ -514,8 +640,18 @@ export async function restoreProject(req: Request, res: Response) {
     throw new ApiError(404, '项目不存在')
   }
 
-  if (project.ownerId !== userId) {
-    throw new ApiError(403, '只有项目负责人可以恢复项目')
+  // 检查权限
+  const isOwner = project.ownerId === userId
+  const isDeptAdmin = project.departmentId && await prisma.department.findFirst({
+    where: { id: project.departmentId, adminId: userId }
+  })
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isAdmin: true }
+  })
+
+  if (!isOwner && !isDeptAdmin && !currentUser?.isAdmin) {
+    throw new ApiError(403, '只有项目负责人或部门管理员可以恢复项目')
   }
 
   if (!project.deletedAt) {
@@ -536,6 +672,9 @@ export async function restoreProject(req: Request, res: Response) {
     include: {
       owner: {
         select: { id: true, nickname: true, avatar: true }
+      },
+      department: {
+        select: { id: true, name: true }
       }
     }
   })
@@ -552,7 +691,7 @@ export async function restoreProject(req: Request, res: Response) {
  */
 export async function permanentDeleteProject(req: Request, res: Response) {
   const { id } = req.params
-  const userId = (req as { userId?: string }).userId
+  const userId = (req as AuthRequest).userId
 
   const project = await prisma.project.findFirst({
     where: { id }
@@ -562,8 +701,18 @@ export async function permanentDeleteProject(req: Request, res: Response) {
     throw new ApiError(404, '项目不存在')
   }
 
-  if (project.ownerId !== userId) {
-    throw new ApiError(403, '只有项目负责人可以永久删除项目')
+  // 检查权限
+  const isOwner = project.ownerId === userId
+  const isDeptAdmin = project.departmentId && await prisma.department.findFirst({
+    where: { id: project.departmentId, adminId: userId }
+  })
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isAdmin: true }
+  })
+
+  if (!isOwner && !isDeptAdmin && !currentUser?.isAdmin) {
+    throw new ApiError(403, '只有项目负责人或部门管理员可以永久删除项目')
   }
 
   if (!project.deletedAt) {
@@ -587,7 +736,7 @@ export async function permanentDeleteProject(req: Request, res: Response) {
 export async function transferProject(req: Request, res: Response) {
   const { id } = req.params
   const { newOwnerId } = req.body
-  const currentUserId = (req as { userId?: string }).userId
+  const currentUserId = (req as AuthRequest).userId
 
   // 检查项目是否存在
   const project = await prisma.project.findFirst({
@@ -628,6 +777,9 @@ export async function transferProject(req: Request, res: Response) {
       include: {
         owner: {
           select: { id: true, nickname: true, avatar: true }
+        },
+        department: {
+          select: { id: true, name: true }
         }
       }
     })

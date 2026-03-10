@@ -26,6 +26,29 @@
       </form>
     </div>
 
+    <!-- 部门信息 -->
+    <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+      <h3 class="text-lg font-semibold mb-4">部门信息</h3>
+      <div v-if="userDepartment" class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+          <Building2 class="w-6 h-6 text-blue-600" />
+        </div>
+        <div>
+          <p class="font-medium text-gray-800">{{ userDepartment.name }}</p>
+          <p class="text-sm text-gray-500">{{ userDepartment.description || '暂无描述' }}</p>
+        </div>
+      </div>
+      <div v-else class="flex items-center gap-4 text-gray-500">
+        <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+          <Building2 class="w-6 h-6 text-gray-400" />
+        </div>
+        <div>
+          <p class="font-medium">未加入部门</p>
+          <p class="text-sm">您目前不属于任何部门</p>
+        </div>
+      </div>
+    </div>
+
     <!-- 修改密码 -->
     <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
       <h3 class="text-lg font-semibold mb-4">修改密码</h3>
@@ -94,8 +117,10 @@
 /**
  * 中集智历 - 设置页面
  */
-import { ref, reactive, onMounted } from 'vue'
+import { computed, ref, reactive, onMounted } from 'vue'
+import { Building2 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
+import { useDepartmentStore } from '@/stores/department'
 import { updateUser } from '@/api/user'
 import { useToast } from '@/composables/useToast'
 import PushSettings from '@/components/settings/PushSettings.vue'
@@ -103,6 +128,8 @@ import PushSettings from '@/components/settings/PushSettings.vue'
 const { toast } = useToast()
 
 const authStore = useAuthStore()
+const departmentStore = useDepartmentStore()
+const userDepartment = computed(() => departmentStore.myDepartment)
 
 const saving = ref(false)
 const changingPassword = ref(false)
@@ -166,10 +193,16 @@ async function handleChangePassword() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (authStore.user) {
     profileForm.nickname = authStore.user.nickname
     profileForm.bio = authStore.user.bio || ''
+  }
+  // 加载用户部门信息
+  try {
+    await departmentStore.fetchMyDepartment()
+  } catch {
+    // 用户可能没有部门，忽略错误
   }
 })
 </script>

@@ -2,8 +2,8 @@
   <div class="flex h-screen" style="background-color: var(--color-bg-page)">
     <!-- 侧边栏 -->
     <aside
-      class="w-64 flex flex-col fixed h-full z-30 transition-transform duration-300 sidebar-gradient"
-      :class="{ '-translate-x-full md:translate-x-0': !sidebarOpen }"
+      class="w-64 flex flex-col fixed h-full z-30 transition-transform duration-300 ease-in-out sidebar-gradient"
+      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
     >
       <!-- Logo -->
       <div class="p-5 border-b border-white/10">
@@ -121,7 +121,7 @@
     </aside>
 
     <!-- 主内容区 -->
-    <div class="flex-1 md:ml-64 flex flex-col">
+    <div class="flex-1 md:ml-64 flex flex-col min-h-screen">
       <!-- 顶部栏 -->
       <header class="h-16 flex items-center px-4 md:px-6 sticky top-0 z-20 header-glass">
         <!-- 移动端菜单按钮 -->

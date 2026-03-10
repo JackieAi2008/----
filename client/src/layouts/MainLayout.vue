@@ -64,8 +64,8 @@
         </ul>
 
         <!-- 管理员菜单 -->
-        <template v-if="authStore.isAdmin || authStore.isDepartmentAdmin">
-          <li class="pt-4">
+        <ul v-if="authStore.isAdmin || authStore.isDepartmentAdmin" class="space-y-1.5 pt-4 mt-4 border-t border-white/10">
+          <li>
             <span class="px-3 text-xs font-medium text-blue-200/50 uppercase tracking-wider">管理</span>
           </li>
           <li v-if="authStore.isAdmin">
@@ -84,7 +84,7 @@
               :active="currentRoute === '/my-department'"
             />
           </li>
-        </template>
+        </ul>
       </nav>
 
       <!-- 用户信息 -->

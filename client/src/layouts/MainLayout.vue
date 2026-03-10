@@ -1,26 +1,26 @@
 <template>
-  <div class="flex h-screen bg-gray-50">
+  <div class="flex h-screen" style="background-color: var(--color-bg-page)">
     <!-- 侧边栏 -->
     <aside
-      class="w-64 bg-slate-900 text-white flex flex-col fixed h-full z-30 transition-transform duration-300"
+      class="w-64 flex flex-col fixed h-full z-30 transition-transform duration-300 sidebar-gradient"
       :class="{ '-translate-x-full md:translate-x-0': !sidebarOpen }"
     >
       <!-- Logo -->
-      <div class="p-4 border-b border-slate-700">
+      <div class="p-5 border-b border-white/10">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-            <Calendar class="w-6 h-6" />
+          <div class="w-11 h-11 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+            <Calendar class="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 class="text-lg font-bold">中集智历</h1>
-            <p class="text-xs text-slate-400">协同日历管理系统</p>
+            <h1 class="text-lg font-bold text-white">中集智历</h1>
+            <p class="text-xs text-blue-200/70">协同日历管理系统</p>
           </div>
         </div>
       </div>
 
       <!-- 导航菜单 -->
       <nav class="flex-1 p-4 overflow-y-auto">
-        <ul class="space-y-2">
+        <ul class="space-y-1.5">
           <li>
             <NavItem
               to="/dashboard"
@@ -42,7 +42,15 @@
               to="/projects"
               icon="FolderKanban"
               label="项目"
-              :active="currentRoute.startsWith('/projects')"
+              :active="currentRoute.startsWith('/projects') && currentRoute !== '/projects/deleted'"
+            />
+          </li>
+          <li>
+            <NavItem
+              to="/projects/deleted"
+              icon="Trash2"
+              label="回收站"
+              :active="currentRoute === '/projects/deleted'"
             />
           </li>
           <li>
@@ -54,13 +62,36 @@
             />
           </li>
         </ul>
+
+        <!-- 管理员菜单 -->
+        <template v-if="authStore.isAdmin || authStore.isDepartmentAdmin">
+          <li class="pt-4">
+            <span class="px-3 text-xs font-medium text-blue-200/50 uppercase tracking-wider">管理</span>
+          </li>
+          <li v-if="authStore.isAdmin">
+            <NavItem
+              to="/admin/departments"
+              icon="Building2"
+              label="部门管理"
+              :active="currentRoute === '/admin/departments'"
+            />
+          </li>
+          <li v-if="authStore.isDepartmentAdmin && !authStore.isAdmin">
+            <NavItem
+              to="/my-department"
+              icon="Users"
+              label="我的部门"
+              :active="currentRoute === '/my-department'"
+            />
+          </li>
+        </template>
       </nav>
 
       <!-- 用户信息 -->
-      <div class="p-4 border-t border-slate-700">
+      <div class="p-4 border-t border-white/10">
         <div class="flex items-center gap-3">
           <div
-            class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden"
+            class="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden ring-2 ring-white/20"
           >
             <img
               v-if="authStore.user?.avatar"
@@ -68,22 +99,22 @@
               alt="头像"
               class="w-full h-full object-cover"
             />
-            <User v-else class="w-5 h-5" />
+            <User v-else class="w-5 h-5 text-white" />
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium truncate">
+            <p class="text-sm font-medium text-white truncate">
               {{ authStore.user?.nickname || '用户' }}
             </p>
-            <p class="text-xs text-slate-400 truncate">
+            <p class="text-xs text-blue-200/70 truncate">
               {{ authStore.user?.email }}
             </p>
           </div>
           <button
             @click="handleLogout"
-            class="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+            class="p-2 hover:bg-white/10 rounded-lg transition-all duration-200 group"
             title="退出登录"
           >
-            <LogOut class="w-4 h-4" />
+            <LogOut class="w-4 h-4 text-blue-200/70 group-hover:text-white transition-colors" />
           </button>
         </div>
       </div>
@@ -92,18 +123,18 @@
     <!-- 主内容区 -->
     <div class="flex-1 md:ml-64 flex flex-col">
       <!-- 顶部栏 -->
-      <header class="h-16 bg-white border-b border-gray-200 flex items-center px-4 sticky top-0 z-20">
+      <header class="h-16 flex items-center px-4 md:px-6 sticky top-0 z-20 header-glass">
         <!-- 移动端菜单按钮 -->
         <button
           @click="sidebarOpen = !sidebarOpen"
-          class="md:hidden p-2 hover:bg-gray-100 rounded-lg mr-2"
+          class="md:hidden p-2 hover:bg-gray-100 rounded-xl mr-2 transition-colors"
         >
-          <Menu class="w-6 h-6" />
+          <Menu class="w-6 h-6 text-gray-600" />
         </button>
 
         <!-- 面包屑或标题 -->
         <div class="flex-1">
-          <h2 class="text-lg font-semibold text-gray-800">{{ pageTitle }}</h2>
+          <h2 class="text-lg font-semibold" style="color: var(--color-text-primary)">{{ pageTitle }}</h2>
         </div>
 
         <!-- 全局搜索 -->
@@ -112,16 +143,16 @@
         </div>
 
         <!-- 右侧操作区 -->
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
           <!-- 通知按钮 -->
           <button
             @click="showNotifications = !showNotifications"
-            class="relative p-2 hover:bg-gray-100 rounded-lg"
+            class="relative p-2.5 hover:bg-gray-100 rounded-xl transition-all duration-200"
           >
-            <Bell class="w-5 h-5 text-gray-600" />
+            <Bell class="w-5 h-5" style="color: var(--color-text-secondary)" />
             <span
               v-if="notificationStore.unreadCount > 0"
-              class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center"
+              class="absolute -top-0.5 -right-0.5 min-w-[20px] h-5 px-1.5 text-xs font-medium rounded-full flex items-center justify-center notification-badge"
             >
               {{ notificationStore.unreadCount > 9 ? '9+' : notificationStore.unreadCount }}
             </span>
@@ -130,9 +161,9 @@
           <!-- 设置按钮 -->
           <router-link
             to="/settings"
-            class="p-2 hover:bg-gray-100 rounded-lg"
+            class="p-2.5 hover:bg-gray-100 rounded-xl transition-all duration-200"
           >
-            <Settings class="w-5 h-5 text-gray-600" />
+            <Settings class="w-5 h-5" style="color: var(--color-text-secondary)" />
           </router-link>
         </div>
       </header>
@@ -144,11 +175,13 @@
     </div>
 
     <!-- 移动端遮罩 -->
-    <div
-      v-if="sidebarOpen"
-      @click="sidebarOpen = false"
-      class="fixed inset-0 bg-black/50 z-20 md:hidden"
-    ></div>
+    <Transition name="fade">
+      <div
+        v-if="sidebarOpen"
+        @click="sidebarOpen = false"
+        class="fixed inset-0 bg-black/50 backdrop-blur-sm z-20 md:hidden"
+      ></div>
+    </Transition>
 
     <!-- 通知面板 -->
     <NotificationPanel
@@ -347,3 +380,47 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+/* 侧边栏渐变背景 - 增强版 */
+.sidebar-gradient {
+  background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 40%, #172554 100%);
+  color: white;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+}
+
+/* 顶部栏毛玻璃效果 - 增强版 */
+.header-glass {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* 通知角标 - 增强版 */
+.notification-badge {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5), 0 0 0 2px rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+}
+
+/* 过渡动画 - 优化版 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* 移动端侧边栏优化 */
+@media (max-width: 768px) {
+  .sidebar-gradient {
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.25);
+  }
+}
+</style>

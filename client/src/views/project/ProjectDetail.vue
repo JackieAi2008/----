@@ -89,22 +89,29 @@
           <div
             v-for="task in tasks"
             :key="task.id"
-            class="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+            class="group p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer flex items-center justify-between"
             @click="goToTask(task.id)"
           >
-            <div class="flex items-center justify-between">
-              <div>
-                <h4 class="font-medium text-gray-800">{{ task.title }}</h4>
-                <p class="text-sm text-gray-500 mt-1">
-                  截止日期：{{ formatDateTime(task.dueDate) }}
-                </p>
-              </div>
+            <div class="flex-1">
+              <h4 class="font-medium text-gray-800">{{ task.title }}</h4>
+              <p class="text-sm text-gray-500 mt-1">
+                截止日期：{{ formatDateTime(task.dueDate) }}
+              </p>
+            </div>
+            <div class="flex items-center gap-3">
               <span
                 class="px-2 py-1 rounded text-xs"
                 :class="getStatusClass(task.status)"
               >
                 {{ getStatusText(task.status) }}
               </span>
+              <button
+                @click.stop="confirmDeleteTask(task)"
+                class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                title="删除任务"
+              >
+                <Trash2 class="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
@@ -272,6 +279,43 @@
         </form>
       </div>
     </div>
+
+    <!-- 任务创建表单 -->
+    <TaskForm
+      v-if="showCreateTask"
+      @close="showCreateTask = false"
+      @saved="handleTaskSaved"
+    />
+
+    <!-- 删除任务确认弹窗 -->
+    <div v-if="showDeleteTaskConfirm" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+        <div class="text-center mb-4">
+          <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <Trash2 class="w-6 h-6 text-red-600" />
+          </div>
+          <h3 class="text-lg font-semibold">确认删除任务？</h3>
+          <p class="text-gray-500 text-sm mt-2">
+            任务「{{ taskToDelete?.title }}」将被归档
+          </p>
+        </div>
+        <div class="flex justify-end gap-3">
+          <button
+            @click="showDeleteTaskConfirm = false; taskToDelete = null"
+            class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            取消
+          </button>
+          <button
+            @click="handleDeleteTask"
+            :disabled="deletingTask"
+            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+          >
+            {{ deletingTask ? '删除中...' : '确认删除' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -281,13 +325,14 @@
  */
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { User, Plus } from 'lucide-vue-next'
+import { User, Plus, Trash2 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectStore } from '@/stores/project'
 import { getProjectMembers, updateProject, inviteUser, transferProject } from '@/api/project'
-import { getTasks } from '@/api/task'
+import { getTasks, deleteTask } from '@/api/task'
 import { searchUsers } from '@/api/user'
 import { formatDate, formatDateTime } from '@/utils/date'
+import TaskForm from '@/components/task/TaskForm.vue'
 import type { Task, TaskStatus } from '@/types/task'
 import type { ProjectMember } from '@/types/project'
 import type { User as UserType } from '@/types/user'
@@ -306,6 +351,9 @@ const showTransferProject = ref(false)
 const saving = ref(false)
 const inviting = ref(false)
 const transferring = ref(false)
+const taskToDelete = ref<Task | null>(null)
+const showDeleteTaskConfirm = ref(false)
+const deletingTask = ref(false)
 const searchKeyword = ref('')
 const searchResults = ref<UserType[]>([])
 const selectedUser = ref<UserType | null>(null)
@@ -450,6 +498,36 @@ async function handleTransferProject() {
     alert('项目移交失败')
   } finally {
     transferring.value = false
+  }
+}
+
+// 任务创建成功后处理
+function handleTaskSaved() {
+  showCreateTask.value = false
+  fetchData()
+}
+
+// 确认删除任务
+function confirmDeleteTask(task: Task) {
+  taskToDelete.value = task
+  showDeleteTaskConfirm.value = true
+}
+
+// 执行删除任务
+async function handleDeleteTask() {
+  if (!taskToDelete.value) return
+
+  deletingTask.value = true
+  try {
+    await deleteTask(taskToDelete.value.id)
+    showDeleteTaskConfirm.value = false
+    taskToDelete.value = null
+    // 刷新任务列表
+    await fetchData()
+  } catch {
+    alert('删除任务失败')
+  } finally {
+    deletingTask.value = false
   }
 }
 

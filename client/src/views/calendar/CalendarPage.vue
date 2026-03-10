@@ -1,14 +1,14 @@
 <template>
-  <div class="h-full flex flex-col">
+  <div class="h-full flex flex-col animate-slide-up">
     <!-- 顶部工具栏 -->
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-3">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 md:mb-6">
+      <div class="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
         <!-- 左箭头 -->
         <button
           @click="prevPeriod"
-          class="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          class="p-2 hover:bg-gray-100 rounded-xl transition-all duration-200 active:scale-95"
         >
-          <ChevronLeft class="w-5 h-5" />
+          <ChevronLeft class="w-5 h-5 text-gray-600" />
         </button>
 
         <!-- 年月选择器（仅在月/年视图显示） -->
@@ -21,7 +21,8 @@
         <!-- 周/日/甘特图视图显示日期范围 -->
         <h2
           v-else
-          class="text-lg font-semibold text-gray-800"
+          class="text-base sm:text-lg md:text-xl font-semibold"
+          style="color: var(--color-text-primary)"
         >
           {{ periodTitle }}
         </h2>
@@ -29,29 +30,30 @@
         <!-- 右箭头 -->
         <button
           @click="nextPeriod"
-          class="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          class="p-2 hover:bg-gray-100 rounded-xl transition-all duration-200 active:scale-95"
         >
-          <ChevronRight class="w-5 h-5" />
+          <ChevronRight class="w-5 h-5 text-gray-600" />
         </button>
 
-        <!-- 今天按钮 -->
+        <!-- 今天按钮（桌面端显示） -->
         <button
           @click="goToToday"
-          class="px-4 py-1.5 text-sm font-medium bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors"
+          class="hidden sm:block px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
         >
           今天
         </button>
       </div>
 
-      <div class="flex items-center gap-4">
+      <!-- 右侧：视图切换和筛选 -->
+      <div class="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1 sm:pb-0">
         <!-- 视图切换 -->
-        <div class="flex bg-gray-100 rounded-lg p-1">
+        <div class="flex bg-gray-100 rounded-lg p-1 flex-shrink-0">
           <button
             v-for="v in viewOptions"
             :key="v.value"
             @click="currentView = v.value"
-            class="px-3 py-1 text-sm rounded-md transition-colors whitespace-nowrap"
-            :class="currentView === v.value ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-900'"
+            class="px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-md transition-colors whitespace-nowrap"
+            :class="currentView === v.value ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'"
           >
             {{ v.label }}
           </button>
@@ -60,9 +62,9 @@
         <!-- 项目筛选 -->
         <select
           v-model="selectedProjectId"
-          class="input w-48"
+          class="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 rounded-lg text-xs sm:text-sm bg-white flex-shrink-0"
         >
-          <option value="">所有项目</option>
+          <option value="">全部项目</option>
           <option v-for="project in projects" :key="project.id" :value="project.id">
             {{ project.name }}
           </option>
@@ -70,8 +72,17 @@
       </div>
     </div>
 
+    <!-- 移动端今天按钮 -->
+    <button
+      @click="goToToday"
+      class="sm:hidden mb-4 w-full py-2.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 flex items-center justify-center gap-2"
+    >
+      <Calendar class="w-4 h-4" />
+      回到今天
+    </button>
+
     <!-- 年历视图 -->
-    <div v-if="currentView === 'year'" class="flex-1 bg-white rounded-lg border border-gray-200 overflow-auto p-4">
+    <div v-if="currentView === 'year'" class="flex-1 bg-white rounded-2xl border border-gray-100 overflow-auto p-4 shadow-card">
       <div class="grid grid-cols-4 gap-4">
         <div
           v-for="month in 12"
@@ -92,12 +103,13 @@
             <div
               v-for="(date, index) in getYearMonthDays(month)"
               :key="index"
-              class="text-center py-0.5"
+              class="text-center py-0.5 cursor-pointer hover:bg-gray-100 rounded"
               :class="{
                 'text-gray-300': !isSameMonth(date, month),
                 'text-blue-600 font-bold': isToday(date),
                 'bg-blue-100 rounded': hasTask(date) && isSameMonth(date, month)
               }"
+              @click="handleYearDateClick(date)"
             >
               {{ date.getDate() }}
             </div>
@@ -107,15 +119,16 @@
     </div>
 
     <!-- 月视图 -->
-    <div v-if="currentView === 'month'" class="flex-1 bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col">
+    <div v-if="currentView === 'month'" class="flex-1 bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col shadow-card">
       <!-- 星期标题 -->
-      <div class="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
+      <div class="grid grid-cols-7 bg-gray-50/50">
         <div
           v-for="day in weekDays"
           :key="day"
-          class="p-3 text-center text-sm font-medium text-gray-600"
+          class="p-2 sm:p-3 text-center text-xs sm:text-sm font-medium text-gray-500"
         >
-          {{ day }}
+          <span class="hidden sm:inline">{{ day }}</span>
+          <span class="sm:hidden">{{ day.slice(0, 1) }}</span>
         </div>
       </div>
 
@@ -199,18 +212,21 @@
     </div>
 
     <!-- 周视图 -->
-    <div v-else-if="currentView === 'week'" class="flex-1 bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col">
+    <div v-else-if="currentView === 'week'" class="flex-1 bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col shadow-card">
       <!-- 星期标题 -->
-      <div class="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
+      <div class="grid grid-cols-7 bg-gray-50/50">
         <div
           v-for="(date, index) in weekDates"
           :key="index"
-          class="p-3 text-center border-r border-gray-200 last:border-r-0"
-          :class="{ 'bg-blue-50': isToday(date) }"
+          class="p-2 sm:p-3 text-center border-r border-gray-100 last:border-r-0"
+          :class="{ 'bg-blue-50/50': isToday(date) }"
         >
-          <div class="text-xs text-gray-500">{{ weekDays[index] }}</div>
+          <div class="text-xs text-gray-500">
+            <span class="hidden sm:inline">{{ weekDays[index] }}</span>
+            <span class="sm:hidden">{{ weekDays[index].slice(0, 1) }}</span>
+          </div>
           <div
-            class="text-lg font-semibold mt-1"
+            class="text-base sm:text-lg font-semibold mt-1"
             :class="{ 'text-blue-600': isToday(date) }"
           >
             {{ date.getDate() }}
@@ -223,7 +239,7 @@
         <div
           v-for="(date, index) in weekDates"
           :key="index"
-          class="border-r border-gray-200 last:border-r-0 p-2 overflow-y-auto transition-colors"
+          class="border-r border-gray-100 last:border-r-0 p-1.5 md:p-2 overflow-y-auto transition-colors"
           :class="{
             'bg-blue-50/30': isToday(date),
             'bg-green-100 ring-2 ring-green-400 ring-inset': isDragOver(date)
@@ -236,18 +252,18 @@
           <div
             v-for="task in getTasksForDate(date)"
             :key="task.id"
-            class="mb-2 p-2 rounded-lg border-l-4 bg-white shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            class="mb-2 p-2 rounded-xl border-l-4 bg-white shadow-sm cursor-pointer hover:shadow-md transition-all duration-200"
             :style="{ borderLeftColor: getTaskColor(task) }"
             draggable="true"
             @dragstart="handleDragStart($event, task)"
             @dragend="handleDragEnd"
             @click.stop="handleTaskClick(task)"
           >
-            <div class="text-sm font-medium text-gray-800 truncate flex items-center gap-1">
+            <div class="text-xs md:text-sm font-medium text-gray-800 truncate flex items-center gap-1">
               <Repeat v-if="task.repeat" class="w-3 h-3 text-purple-500 flex-shrink-0" />
               <span class="truncate">{{ task.title }}</span>
             </div>
-            <div class="text-xs text-gray-500 mt-1">
+            <div class="text-xs text-gray-500 mt-0.5">
               {{ formatTime(task.dueDate) }}
             </div>
           </div>
@@ -256,9 +272,9 @@
     </div>
 
     <!-- 日视图 -->
-    <div v-else-if="currentView === 'day'" class="flex-1 bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col">
+    <div v-else-if="currentView === 'day'" class="flex-1 bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col shadow-card">
       <!-- 日期标题 -->
-      <div class="p-4 border-b border-gray-200 bg-gray-50">
+      <div class="p-4 md:p-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
         <div class="text-center">
           <div class="text-sm text-gray-500">{{ getWeekDayName(selectedDate) }}</div>
           <div
@@ -610,7 +626,7 @@
  */
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronLeft, ChevronRight, Repeat, Trash2, Archive, X } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, Repeat, Trash2, Archive, X, Calendar } from 'lucide-vue-next'
 import { useProjectStore } from '@/stores/project'
 import { getTasks, updateTask, batchUpdateTasks, batchDeleteTasks, batchArchiveTasks } from '@/api/task'
 import { getCalendarDays, isToday as checkIsToday, isSameDay, getWeekDayName, formatDateTime } from '@/utils/date'
@@ -1129,19 +1145,22 @@ function isGanttTodayVisible(): boolean {
   return today >= startDate && today <= endDate
 }
 
+// 月视图/周视图点击日期格子 - 打开任务创建表单
 function handleDateClick(date: Date) {
   selectedDate.value = date
-  if (currentView.value === 'month') {
-    // 切换到日视图
-    currentView.value = 'day'
-  } else {
-    showCreateTask.value = true
-  }
+  showCreateTask.value = true
 }
 
+// 日视图点击时间格子 - 打开任务创建表单
 function handleTimeClick(hour: number) {
   const date = new Date(selectedDate.value)
   date.setHours(hour, 0, 0, 0)
+  selectedDate.value = date
+  showCreateTask.value = true
+}
+
+// 年视图点击日期数字 - 打开任务创建表单
+function handleYearDateClick(date: Date) {
   selectedDate.value = date
   showCreateTask.value = true
 }

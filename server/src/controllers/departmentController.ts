@@ -581,7 +581,8 @@ export async function getDepartmentDashboard(req: Request, res: Response) {
       title: true,
       status: true,
       dueDate: true,
-      assignee: { select: { id: true, nickname: true } }
+      assignee: { select: { id: true, nickname: true } },
+      project: { select: { id: true, name: true } }
     },
     orderBy: { updatedAt: 'desc' },
     take: 10

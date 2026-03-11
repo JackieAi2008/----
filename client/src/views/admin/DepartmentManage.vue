@@ -48,12 +48,12 @@
       <div v-if="loading" class="p-8 text-center text-gray-500">
         加载中...
       </div>
-      <div v-else-if="dashboardDepartments.length === 0 && departments.length === 0" class="p-8 text-center text-gray-500">
+      <div v-else-if="departmentList.length === 0" class="p-8 text-center text-gray-500">
         暂无部门，点击上方按钮创建第一个部门
       </div>
       <div v-else class="divide-y divide-gray-200">
         <div
-          v-for="dept in dashboardDepartments.length > 0 ? dashboardDepartments : departments"
+          v-for="dept in departmentList"
           :key="dept.id"
           class="p-4 hover:bg-gray-50"
         >
@@ -72,11 +72,11 @@
             <div class="flex items-center gap-6 text-sm text-gray-500">
               <div class="flex items-center gap-1">
                 <Users class="w-4 h-4" />
-                <span>{{ dept.memberCount || 0 }} 人</span>
+                <span>{{ dept.memberCount }} 人</span>
               </div>
               <div class="flex items-center gap-1">
                 <FolderKanban class="w-4 h-4" />
-                <span>{{ dept.projectCount || 0 }} 个项目</span>
+                <span>{{ dept.projectCount }} 个项目</span>
               </div>
               <div class="w-32">
                 <ProgressBar
@@ -175,7 +175,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { Plus, Building2, Users, FolderKanban, Crown, Pencil, Trash2, CheckCircle } from 'lucide-vue-next'
+import { Plus, Building2, Users, FolderKanban, Pencil, Trash2, CheckCircle } from 'lucide-vue-next'
 import { useDepartmentStore } from '@/stores/department'
 import type { Department } from '@/types/department'
 import type { User } from '@/types/user'
@@ -183,6 +183,18 @@ import { get } from '@/utils/request'
 import StatisticsCard from '@/components/StatisticsCard.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import { getAdminDashboard, type AdminDashboard } from '@/api/dashboard'
+
+// 部门列表项类型（合并 department 和 dashboard 数据）
+interface DepartmentListItem {
+  id: string
+  name: string
+  description: string | null
+  adminId: string
+  memberCount: number
+  projectCount: number
+  taskStats: { todo: number; inProgress: number; done: number } | null
+  isFullDepartment: boolean // 是否来自 store 的完整 department
+}
 
 const departmentStore = useDepartmentStore()
 
@@ -200,7 +212,41 @@ const form = ref({
 })
 
 const departments = computed(() => departmentStore.departments)
-const dashboardDepartments = computed(() => dashboard.value?.departments || [])
+
+// 合并部门列表数据
+const departmentList = computed<DepartmentListItem[]>(() => {
+  const storeDepartments = departmentStore.departments
+  const dashboardDepts = dashboard.value?.departments || []
+
+  if (dashboardDepts.length > 0) {
+    // 使用 dashboard 数据并合并 store 数据
+    return dashboardDepts.map(dd => {
+      const storeDept = storeDepartments.find(sd => sd.id === dd.id)
+      return {
+        id: dd.id,
+        name: dd.name,
+        description: storeDept?.description || null,
+        adminId: storeDept?.adminId || '',
+        memberCount: dd.memberCount,
+        projectCount: dd.projectCount,
+        taskStats: dd.taskStats,
+        isFullDepartment: !!storeDept
+      }
+    })
+  }
+
+  // 回退到 store 数据
+  return storeDepartments.map(sd => ({
+    id: sd.id,
+    name: sd.name,
+    description: sd.description || null,
+    adminId: sd.adminId,
+    memberCount: sd.memberCount || sd.members?.length || 0,
+    projectCount: sd.projectCount || sd.projects?.length || 0,
+    taskStats: null,
+    isFullDepartment: true
+  }))
+})
 
 // 获取可用用户列表
 async function fetchAvailableUsers() {
@@ -213,12 +259,14 @@ async function fetchAvailableUsers() {
 }
 
 // 打开编辑弹窗
-function openEditModal(dept: Department) {
-  editingDepartment.value = dept
+function openEditModal(dept: DepartmentListItem) {
+  const fullDept = departments.value.find(d => d.id === dept.id)
+  if (!fullDept) return
+  editingDepartment.value = fullDept
   form.value = {
-    name: dept.name,
-    description: dept.description || '',
-    adminId: dept.adminId
+    name: fullDept.name,
+    description: fullDept.description || '',
+    adminId: fullDept.adminId
   }
 }
 
@@ -241,7 +289,8 @@ async function handleSubmit() {
     closeModal()
     await departmentStore.fetchDepartments()
     // 重新获取仪表盘数据
-    dashboard.value = await getAdminDashboard().catch(() => null)
+    const result = await getAdminDashboard().catch(() => null)
+    dashboard.value = result ?? null
   } catch (e) {
     console.error('操作失败:', e)
   } finally {
@@ -250,7 +299,7 @@ async function handleSubmit() {
 }
 
 // 删除部门
-async function handleDelete(dept: Department) {
+async function handleDelete(dept: DepartmentListItem) {
   if (!confirm(`确定要删除部门「${dept.name}」吗？该操作不可撤销。`)) {
     return
   }
@@ -258,7 +307,8 @@ async function handleDelete(dept: Department) {
     await departmentStore.deleteDepartment(dept.id)
     await departmentStore.fetchDepartments()
     // 重新获取仪表盘数据
-    dashboard.value = await getAdminDashboard().catch(() => null)
+    const result = await getAdminDashboard().catch(() => null)
+    dashboard.value = result ?? null
   } catch (e) {
     console.error('删除失败:', e)
   }
@@ -271,7 +321,8 @@ onMounted(async () => {
       departmentStore.fetchDepartments(),
       fetchAvailableUsers()
     ])
-    dashboard.value = await getAdminDashboard().catch(() => null) ?? null
+    const result = await getAdminDashboard().catch(() => null)
+    dashboard.value = result ?? null
   } finally {
     loading.value = false
   }

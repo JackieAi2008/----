@@ -128,6 +128,10 @@ export interface DepartmentDashboard {
       id: string
       nickname: string
     }
+    project?: {
+      id: string
+      name: string
+    }
   }>
 }
 

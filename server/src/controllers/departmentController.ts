@@ -5,6 +5,7 @@ import { Request, Response } from 'express'
 import prisma from '../config/database.js'
 import { ApiError } from '../middlewares/errorHandler.js'
 import { AuthRequest } from '../middlewares/auth.js'
+import * as statisticsService from '../services/statisticsService.js'
 
 /**
  * 获取所有部门列表（系统管理员）
@@ -486,5 +487,224 @@ export async function getDepartmentOptions(_req: Request, res: Response) {
   res.json({
     success: true,
     data: departments
+  })
+}
+
+/**
+ * 获取部门仪表盘数据
+ */
+export async function getDepartmentDashboard(req: Request, res: Response) {
+  const { id } = req.params
+  const currentUserId = (req as AuthRequest).userId
+
+  // 检查权限：系统管理员或本部门成员
+  const currentUser = await prisma.user.findUnique({
+    where: { id: currentUserId },
+    select: { isAdmin: true, departmentId: true }
+  })
+
+  if (!currentUser?.isAdmin && currentUser?.departmentId !== id) {
+    throw new ApiError(403, '无权查看此部门信息')
+  }
+
+  // 获取部门基本信息
+  const department = await prisma.department.findUnique({
+    where: { id },
+    include: {
+      admin: {
+        select: { id: true, nickname: true, email: true, avatar: true }
+      }
+    }
+  })
+
+  if (!department) {
+    throw new ApiError(404, '部门不存在')
+  }
+
+  // 获取统计数据
+  const [taskStats, projectStats, members] = await Promise.all([
+    statisticsService.calculateDepartmentTaskStats(id),
+    statisticsService.calculateDepartmentProjectStats(id),
+    prisma.user.findMany({
+      where: { departmentId: id },
+      select: {
+        id: true,
+        nickname: true,
+        avatar: true
+      }
+    })
+  ])
+
+  // 获取成员工作负载
+  const membersWithWorkload = await Promise.all(
+    members.map(async (member) => ({
+      ...member,
+      workload: await statisticsService.calculateMemberWorkload(member.id)
+    }))
+  )
+
+  // 获取部门项目
+  const projects = await prisma.project.findMany({
+    where: { departmentId: id, deletedAt: null },
+    select: {
+      id: true,
+      name: true,
+      _count: { select: { tasks: { where: { deletedAt: null } } } }
+    },
+    take: 10
+  })
+
+  // 计算项目进度
+  const projectsWithProgress = await Promise.all(
+    projects.map(async (project) => {
+      const totalTasks = project._count.tasks
+      const doneTasks = await prisma.task.count({
+        where: { projectId: project.id, status: 'DONE', deletedAt: null }
+      })
+      return {
+        id: project.id,
+        name: project.name,
+        taskCount: totalTasks,
+        progress: totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
+      }
+    })
+  )
+
+  // 获取最近任务
+  const recentTasks = await prisma.task.findMany({
+    where: {
+      project: { departmentId: id },
+      deletedAt: null
+    },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      dueDate: true,
+      assignee: { select: { id: true, nickname: true } }
+    },
+    orderBy: { updatedAt: 'desc' },
+    take: 10
+  })
+
+  // 活跃成员统计（本周有任务更新的）
+  const oneWeekAgo = new Date()
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+  const activeMembers = await prisma.task.count({
+    where: {
+      project: { departmentId: id },
+      updatedAt: { gte: oneWeekAgo },
+      deletedAt: null
+    }
+  })
+
+  res.json({
+    success: true,
+    data: {
+      department: {
+        id: department.id,
+        name: department.name,
+        description: department.description,
+        adminId: department.adminId
+      },
+      statistics: {
+        tasks: taskStats,
+        projects: {
+          active: projectStats.active,
+          completed: projectStats.completed
+        },
+        members: {
+          total: members.length,
+          activeThisWeek: activeMembers
+        }
+      },
+      members: membersWithWorkload,
+      projects: projectsWithProgress,
+      recentTasks
+    }
+  })
+}
+
+/**
+ * 获取部门成员详情（含日历）
+ */
+export async function getMemberDetail(req: Request, res: Response) {
+  const { id: departmentId, userId } = req.params
+  const currentUserId = (req as AuthRequest).userId
+
+  // 检查权限
+  const currentUser = await prisma.user.findUnique({
+    where: { id: currentUserId },
+    select: { isAdmin: true, departmentId: true }
+  })
+
+  if (!currentUser?.isAdmin && currentUser?.departmentId !== departmentId) {
+    throw new ApiError(403, '无权查看此成员信息')
+  }
+
+  // 检查用户是否在该部门
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      nickname: true,
+      email: true,
+      avatar: true,
+      departmentId: true
+    }
+  })
+
+  if (!user || user.departmentId !== departmentId) {
+    throw new ApiError(404, '成员不存在或不在此部门')
+  }
+
+  // 获取用户的所有任务
+  const tasks = await prisma.task.findMany({
+    where: {
+      assigneeId: userId,
+      deletedAt: null,
+      isArchived: false
+    },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      priority: true,
+      dueDate: true,
+      project: { select: { id: true, name: true } }
+    },
+    orderBy: { dueDate: 'asc' }
+  })
+
+  // 构建日历数据（按日期分组）
+  const calendarMap = new Map<string, { date: string; taskCount: number; tasks: typeof tasks }>()
+
+  for (const task of tasks) {
+    if (task.dueDate) {
+      const dateStr = new Date(task.dueDate).toISOString().split('T')[0]
+      const existing = calendarMap.get(dateStr)
+      if (existing) {
+        existing.taskCount++
+        existing.tasks.push(task)
+      } else {
+        calendarMap.set(dateStr, { date: dateStr, taskCount: 1, tasks: [task] })
+      }
+    }
+  }
+
+  const calendar = Array.from(calendarMap.values()).sort((a, b) => a.date.localeCompare(b.date))
+
+  res.json({
+    success: true,
+    data: {
+      user: {
+        id: user.id,
+        nickname: user.nickname,
+        email: user.email,
+        avatar: user.avatar
+      },
+      tasks,
+      calendar
+    }
   })
 }

@@ -6,6 +6,7 @@ import cors from 'cors'
 import morgan from 'morgan'
 import compression from 'compression'
 import { config } from 'dotenv'
+import 'express-async-errors'
 
 // 加载环境变量
 config()
@@ -24,6 +25,7 @@ import pushRoutes from './routes/push.js'
 import tagRoutes from './routes/tags.js'
 import templateRoutes from './routes/templates.js'
 import departmentRoutes from './routes/departments.js'
+import adminRoutes from './routes/admin.js'
 
 // 导入中间件
 import { errorHandler } from './middlewares/errorHandler.js'
@@ -62,6 +64,7 @@ app.use('/api/push', pushRoutes)
 app.use('/api/tags', tagRoutes)
 app.use('/api/templates', templateRoutes)
 app.use('/api/departments', departmentRoutes)
+app.use('/api/admin', adminRoutes)
 
 // 健康检查
 app.get('/api/health', (_req, res) => {

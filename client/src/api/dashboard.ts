@@ -1,15 +1,35 @@
 /**
- * 中集智历 - 仪表盘相关API
+ * 中集智历 - 仪表盘 API
  */
 import { get } from '@/utils/request'
-import type { Task } from '@/types/task'
-import type { Project } from '@/types/project'
+import type { User } from '@/types/user'
 
-// 仪表盘数据类型
+// 通用仪表盘数据类型（用于个人仪表盘）
 export interface DashboardData {
-  todayTasks: Task[]
-  overdueTasks: Task[]
-  upcomingTasks: Task[]
+  todayTasks: Array<{
+    id: string
+    title: string
+    status: string
+    priority: string
+    dueDate: string
+    project?: { id: string; name: string }
+  }>
+  overdueTasks: Array<{
+    id: string
+    title: string
+    status: string
+    priority: string
+    dueDate: string
+    project?: { id: string; name: string }
+  }>
+  upcomingTasks: Array<{
+    id: string
+    title: string
+    status: string
+    priority: string
+    dueDate: string
+    project?: { id: string; name: string }
+  }>
   weekTasksCount: number
   monthStats: {
     total: number
@@ -17,36 +37,174 @@ export interface DashboardData {
     completionRate: number
   }
   projectCount: number
-  recentProjects: Array<Project & { _count?: { tasks: number } }>
+  recentProjects: Array<{
+    id: string
+    name: string
+    description?: string
+    taskCount: number
+  }>
 }
 
-// 工作统计类型
+// 工作统计数据类型
 export interface WorkStats {
-  statusStats: Array<{ status: string; _count: number }>
-  projectStats: Array<{ projectId: string; projectName: string; count: number }>
-  dateRange: { start: string; end: string }
+  daily: Array<{
+    date: string
+    created: number
+    completed: number
+  }>
+  weekly: Array<{
+    week: string
+    created: number
+    completed: number
+  }>
+  monthly: Array<{
+    month: string
+    created: number
+    completed: number
+  }>
 }
 
 /**
- * 获取仪表盘数据
+ * 获取个人仪表盘数据
  */
-export async function getDashboard(): Promise<DashboardData> {
+export async function getDashboard() {
   const response = await get<DashboardData>('/dashboard')
-  return response.data!
+  return response.data
 }
 
 /**
- * 获取工作统计
+ * 获取工作统计数据
  */
-export async function getWorkStats(params?: {
-  startDate?: string
-  endDate?: string
-}): Promise<WorkStats> {
-  const query = new URLSearchParams()
-  if (params?.startDate) query.append('startDate', params.startDate)
-  if (params?.endDate) query.append('endDate', params.endDate)
+export async function getWorkStats(range: 'day' | 'week' | 'month' = 'week') {
+  const response = await get<WorkStats>(`/dashboard/work-stats?range=${range}`)
+  return response.data
+}
 
-  const url = `/dashboard/stats${query.toString() ? '?' + query.toString() : ''}`
-  const response = await get<WorkStats>(url)
-  return response.data!
+// 部门仪表盘数据类型
+export interface DepartmentDashboard {
+  department: {
+    id: string
+    name: string
+    description?: string
+    adminId: string
+  }
+  statistics: {
+    tasks: {
+      todo: number
+      inProgress: number
+      done: number
+      cancelled: number
+      overdue: number
+    }
+    projects: {
+      active: number
+      completed: number
+    }
+    members: {
+      total: number
+      activeThisWeek: number
+    }
+  }
+  members: Array<User & {
+    workload: {
+      total: number
+      todo: number
+      inProgress: number
+      done: number
+    }
+  }>
+  projects: Array<{
+    id: string
+    name: string
+    progress: number
+    taskCount: number
+  }>
+  recentTasks: Array<{
+    id: string
+    title: string
+    status: string
+    dueDate: string
+    assignee: {
+      id: string
+      nickname: string
+    }
+  }>
+}
+
+// 系统管理仪表盘数据类型
+export interface AdminDashboard {
+  overview: {
+    departments: number
+    users: number
+    projects: number
+    tasks: number
+    tasksByStatus: {
+      todo: number
+      inProgress: number
+      done: number
+      cancelled: number
+    }
+  }
+  departments: Array<{
+    id: string
+    name: string
+    memberCount: number
+    projectCount: number
+    taskStats: {
+      todo: number
+      inProgress: number
+      done: number
+    }
+  }>
+}
+
+// 成员详情数据类型
+export interface MemberDetail {
+  user: User
+  tasks: Array<{
+    id: string
+    title: string
+    status: string
+    priority: string
+    dueDate: string
+    project: {
+      id: string
+      name: string
+    }
+  }>
+  calendar: Array<{
+    date: string
+    taskCount: number
+    tasks: Array<{
+      id: string
+      title: string
+      status: string
+      priority: string
+      dueDate: string
+    }>
+  }>
+}
+
+/**
+ * 获取部门仪表盘数据
+ */
+export async function getDepartmentDashboard(departmentId: string) {
+  const response = await get<DepartmentDashboard>(`/departments/${departmentId}/dashboard`)
+  return response.data
+}
+
+/**
+ * 获取系统管理仪表盘数据
+ */
+export async function getAdminDashboard() {
+  const response = await get<AdminDashboard>('/admin/dashboard')
+  return response.data
+}
+
+/**
+ * 获取成员详情
+ */
+export async function getMemberDetail(departmentId: string, userId: string) {
+  const response = await get<MemberDetail>(`/departments/${departmentId}/members/${userId}`)
+  return response.data
 }

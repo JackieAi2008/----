@@ -17,9 +17,9 @@ router.get('/', auth, requireAdmin, departmentController.getDepartments)
 /**
  * @route   GET /api/departments/options
  * @desc    获取部门选项列表（用于下拉选择）
- * @access  Private
+ * @access  Public
  */
-router.get('/options', auth, departmentController.getDepartmentOptions)
+router.get('/options', departmentController.getDepartmentOptions)
 
 /**
  * @route   GET /api/departments/my
@@ -34,6 +34,20 @@ router.get('/my', auth, requireDepartmentAdmin, departmentController.getMyDepart
  * @access  Private
  */
 router.get('/:id', auth, departmentController.getDepartmentById)
+
+/**
+ * @route   GET /api/departments/:id/dashboard
+ * @desc    获取部门仪表盘数据
+ * @access  Private (Department Member)
+ */
+router.get('/:id/dashboard', auth, departmentController.getDepartmentDashboard)
+
+/**
+ * @route   GET /api/departments/:id/members/:userId
+ * @desc    获取部门成员详情（含日历）
+ * @access  Private (Department Member)
+ */
+router.get('/:id/members/:userId', auth, departmentController.getMemberDetail)
 
 /**
  * @route   POST /api/departments

@@ -207,8 +207,9 @@ export async function updateProject(req, res) {
     });
 }
 /**
- * 删除项目（永久删除）
+ * 删除项目（软删除，移入回收站）
  * - 项目负责人、部门管理员、系统管理员可以删除
+ * - 删除后30天内可恢复
  */
 export async function deleteProject(req, res) {
     const { id } = req.params;
@@ -231,13 +232,14 @@ export async function deleteProject(req, res) {
     if (!isOwner && !isDeptAdmin && !currentUser?.isAdmin) {
         throw new ApiError(403, '只有项目负责人或部门管理员可以删除项目');
     }
-    // 永久删除项目（会级联删除相关数据）
-    await prisma.project.delete({
-        where: { id }
+    // 软删除项目（设置 deletedAt）
+    await prisma.project.update({
+        where: { id },
+        data: { deletedAt: new Date() }
     });
     res.json({
         success: true,
-        message: '项目已删除'
+        message: '项目已移入回收站，30天内可恢复'
     });
 }
 /**

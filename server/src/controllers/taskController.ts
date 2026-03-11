@@ -178,6 +178,7 @@ export async function createTask(req: Request, res: Response) {
     categoryId,
     assigneeId,
     priority,
+    visibility,  // 新增：任务可见性
     deliverable,
     tags,
     reminder,
@@ -208,6 +209,7 @@ export async function createTask(req: Request, res: Response) {
       assigneeId,
       priority: priority || 'MEDIUM',
       status: 'TODO',
+      visibility: visibility || 'PRIVATE',  // 默认私密
       deliverable,
       tags: tags || [],
       reminder,
@@ -283,6 +285,7 @@ export async function updateTask(req: Request, res: Response) {
     assigneeId,
     priority,
     status,
+    visibility,  // 新增：任务可见性
     deliverable,
     tags,
     reminder,
@@ -320,6 +323,7 @@ export async function updateTask(req: Request, res: Response) {
       assigneeId,
       priority,
       status,
+      visibility,  // 更新可见性
       deliverable,
       tags: tags || [],
       reminder,

@@ -93,42 +93,44 @@
     <Transition name="fade">
       <div v-if="showCreateProject" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in">
-          <div class="p-6">
-            <h3 class="text-xl font-semibold text-gray-800 mb-5">新建项目</h3>
-            <form @submit.prevent="handleCreateProject" class="space-y-5">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">项目名称</label>
-                <input v-model="newProject.name" type="text" class="input" placeholder="输入项目名称" required />
+          <form @submit.prevent="handleCreateProject">
+            <div class="p-6">
+              <h3 class="text-xl font-semibold text-gray-800 mb-5">新建项目</h3>
+              <div class="space-y-5">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">项目名称</label>
+                  <input v-model="newProject.name" type="text" class="input" placeholder="输入项目名称" required />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">项目描述</label>
+                  <textarea v-model="newProject.description" class="input resize-none" rows="3" placeholder="简单描述项目内容"></textarea>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">可见性</label>
+                  <select v-model="newProject.visibility" class="input cursor-pointer">
+                    <option value="PRIVATE">私密</option>
+                    <option value="PUBLIC">公开</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">项目描述</label>
-                <textarea v-model="newProject.description" class="input resize-none" rows="3" placeholder="简单描述项目内容"></textarea>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">可见性</label>
-                <select v-model="newProject.visibility" class="input cursor-pointer">
-                  <option value="PRIVATE">私密</option>
-                  <option value="PUBLIC">公开</option>
-                </select>
-              </div>
-            </form>
-          </div>
-          <div class="flex justify-end gap-3 px-6 py-4 bg-gray-50/50 rounded-b-2xl">
-            <button
-              type="button"
-              @click="showCreateProject = false"
-              class="px-5 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl font-medium transition-colors"
-            >
-              取消
-            </button>
-            <button
-              @click="handleCreateProject"
-              :disabled="creating"
-              class="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-medium shadow-button hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              {{ creating ? '创建中...' : '创建项目' }}
-            </button>
-          </div>
+            </div>
+            <div class="flex justify-end gap-3 px-6 py-4 bg-gray-50/50 rounded-b-2xl">
+              <button
+                type="button"
+                @click="showCreateProject = false"
+                class="px-5 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl font-medium transition-colors"
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                :disabled="creating || !newProject.name.trim()"
+                class="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-medium shadow-button hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {{ creating ? '创建中...' : '创建项目' }}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </Transition>
@@ -204,9 +206,19 @@ function goToProject(id: string) {
 }
 
 async function handleCreateProject() {
+  // 验证项目名称
+  if (!newProject.name.trim()) {
+    alert('请输入项目名称')
+    return
+  }
+
   creating.value = true
   try {
-    const project = await projectStore.createProject(newProject)
+    const project = await projectStore.createProject({
+      name: newProject.name.trim(),
+      description: newProject.description.trim() || undefined,
+      visibility: newProject.visibility
+    })
     showCreateProject.value = false
     // 重置表单
     newProject.name = ''
@@ -216,7 +228,7 @@ async function handleCreateProject() {
     router.push(`/projects/${project.id}`)
   } catch (error) {
     devLog.error('创建项目失败', error)
-    alert('创建项目失败')
+    alert('创建项目失败，请检查网络连接后重试')
   } finally {
     creating.value = false
   }

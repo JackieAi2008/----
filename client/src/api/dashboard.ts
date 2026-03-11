@@ -13,6 +13,7 @@ export interface DashboardData {
     priority: string
     dueDate: string
     project?: { id: string; name: string }
+    category?: { id: string; name: string; color: string }
   }>
   overdueTasks: Array<{
     id: string
@@ -21,6 +22,7 @@ export interface DashboardData {
     priority: string
     dueDate: string
     project?: { id: string; name: string }
+    category?: { id: string; name: string; color: string }
   }>
   upcomingTasks: Array<{
     id: string
@@ -29,6 +31,7 @@ export interface DashboardData {
     priority: string
     dueDate: string
     project?: { id: string; name: string }
+    category?: { id: string; name: string; color: string }
   }>
   weekTasksCount: number
   monthStats: {
@@ -42,6 +45,8 @@ export interface DashboardData {
     name: string
     description?: string
     taskCount: number
+    visibility?: 'PUBLIC' | 'PRIVATE'
+    _count?: { tasks: number }
   }>
 }
 
@@ -62,6 +67,15 @@ export interface WorkStats {
     created: number
     completed: number
   }>
+  statusStats?: Array<{
+    status: string
+    count: number
+  }>
+  projectStats?: Array<{
+    projectId: string
+    projectName: string
+    count: number
+  }>
 }
 
 /**
@@ -75,8 +89,16 @@ export async function getDashboard() {
 /**
  * 获取工作统计数据
  */
-export async function getWorkStats(range: 'day' | 'week' | 'month' = 'week') {
-  const response = await get<WorkStats>(`/dashboard/work-stats?range=${range}`)
+export async function getWorkStats(range?: 'day' | 'week' | 'month' | { startDate: string; endDate: string }) {
+  if (!range) {
+    const response = await get<WorkStats>('/dashboard/stats')
+    return response.data
+  }
+  if (typeof range === 'string') {
+    const response = await get<WorkStats>(`/dashboard/stats?range=${range}`)
+    return response.data
+  }
+  const response = await get<WorkStats>(`/dashboard/stats?startDate=${range.startDate}&endDate=${range.endDate}`)
   return response.data
 }
 

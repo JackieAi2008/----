@@ -1,0 +1,1 @@
+import{b as r,e as n}from"./index-ffSHGPn3.js";async function c(){return(await r("/users")).data??[]}async function u(s,e){return(await n(`/users/${s}`,e)).data}async function p(s,e){const a={keyword:s};return e&&(a.projectId=e),(await r("/users/search",{params:a})).data??[]}export{c as g,p as s,u};

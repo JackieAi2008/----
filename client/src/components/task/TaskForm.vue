@@ -167,6 +167,15 @@
           </div>
         </div>
 
+        <!-- 可见性 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">可见性</label>
+          <select v-model="form.visibility" class="input">
+            <option value="PRIVATE">私密（仅参与者可见）</option>
+            <option value="PUBLIC">公开（项目成员可见）</option>
+          </select>
+        </div>
+
         <!-- 提醒设置 -->
         <div class="grid grid-cols-2 gap-4">
           <div>
@@ -367,6 +376,7 @@ const form = reactive({
   assigneeId: '',
   categoryId: '',
   priority: 'MEDIUM' as 'HIGH' | 'MEDIUM' | 'LOW',
+  visibility: 'PRIVATE' as 'PUBLIC' | 'PRIVATE',  // 新增：任务可见性
   reminder: '',
   repeat: '',
   deliverable: '',
@@ -489,6 +499,7 @@ async function handleSubmit() {
       assigneeId: form.assigneeId,
       categoryId: form.categoryId || undefined,
       priority: form.priority,
+      visibility: form.visibility,  // 新增：任务可见性
       reminder: (form.reminder || undefined) as Reminder | undefined,
       repeat: (form.repeat || undefined) as Repeat | undefined,
       deliverable: form.deliverable || undefined,

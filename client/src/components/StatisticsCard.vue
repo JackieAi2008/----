@@ -1,5 +1,10 @@
 <template>
-  <div class="bg-white rounded-lg border border-gray-200 p-4">
+  <component
+    :is="to ? 'router-link' : 'div'"
+    :to="to"
+    class="bg-white rounded-lg border border-gray-200 p-4"
+    :class="{ 'cursor-pointer hover:shadow-md hover:border-blue-300 transition-all': to }"
+  >
     <div class="flex items-center gap-3">
       <div
         class="w-10 h-10 rounded-lg flex items-center justify-center"
@@ -12,7 +17,7 @@
         <p class="text-sm text-gray-500">{{ label }}</p>
       </div>
     </div>
-  </div>
+  </component>
 </template>
 
 <script setup lang="ts">
@@ -23,6 +28,7 @@ const props = defineProps<{
   value: number | string
   label: string
   color?: 'blue' | 'green' | 'yellow' | 'red' | 'purple'
+  to?: string
 }>()
 
 const colorMap = {

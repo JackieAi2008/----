@@ -330,7 +330,10 @@ function handleCardToggle(cardName: string) {
 async function fetchDashboard() {
   loading.value = true
   try {
-    dashboard.value = await getDashboard()
+    const data = await getDashboard()
+    if (data) {
+      dashboard.value = data
+    }
   } catch (error) {
     devLog.error('获取仪表盘数据失败', error)
   } finally {

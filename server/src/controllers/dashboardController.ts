@@ -91,7 +91,7 @@ export async function getDashboard(req: Request, res: Response) {
       take: 10
     }),
 
-    // 本周任务统计
+    // 本周任务统计（只统计公开任务）
     prisma.task.count({
       where: {
         OR: [
@@ -99,11 +99,12 @@ export async function getDashboard(req: Request, res: Response) {
           { collaborators: { some: { userId } } }
         ],
         dueDate: { gte: today, lt: weekLater },
-        deletedAt: null
+        deletedAt: null,
+        visibility: 'PUBLIC'
       }
     }),
 
-    // 本月统计
+    // 本月统计（只统计公开任务）
     prisma.task.groupBy({
       by: ['status'],
       where: {
@@ -112,7 +113,8 @@ export async function getDashboard(req: Request, res: Response) {
           { collaborators: { some: { userId } } }
         ],
         dueDate: { gte: monthStart, lte: monthEnd },
-        deletedAt: null
+        deletedAt: null,
+        visibility: 'PUBLIC'
       },
       _count: true
     }),

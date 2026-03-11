@@ -148,26 +148,42 @@ export async function createProject(req: Request, res: Response) {
   const userId = (req as AuthRequest).userId
   const { name, description, visibility } = req.body
 
+  // 验证用户ID
+  if (!userId) {
+    throw new ApiError(401, '用户未登录')
+  }
+
+  // 验证项目名称
+  if (!name || !name.trim()) {
+    throw new ApiError(400, '项目名称不能为空')
+  }
+
   // 获取创建者的部门
   const creator = await prisma.user.findUnique({
     where: { id: userId },
     select: { departmentId: true }
   })
 
+  console.log('[createProject] 创建项目:', {
+    userId,
+    name: name.trim(),
+    departmentId: creator?.departmentId,
+    visibility
+  })
+
+  // 生成项目ID
+  const projectId = crypto.randomUUID()
+
   // 创建项目
   const project = await prisma.project.create({
     data: {
-      name,
-      description,
-      visibility,
-      ownerId: userId!,
+      id: projectId,
+      name: name.trim(),
+      description: description?.trim() || null,
+      visibility: visibility || 'PRIVATE',
+      ownerId: userId,
       departmentId: creator?.departmentId,
-      members: {
-        create: {
-          userId: userId!,
-          role: 'OWNER'
-        }
-      }
+      updatedAt: new Date()
     },
     include: {
       owner: {
@@ -178,6 +194,18 @@ export async function createProject(req: Request, res: Response) {
       }
     }
   })
+
+  // 添加创建者为项目负责人
+  await prisma.projectMember.create({
+    data: {
+      id: crypto.randomUUID(),
+      projectId: project.id,
+      userId: userId,
+      role: 'OWNER'
+    }
+  })
+
+  console.log('[createProject] 项目创建成功:', project.id)
 
   res.status(201).json({
     success: true,
@@ -239,8 +267,9 @@ export async function updateProject(req: Request, res: Response) {
 }
 
 /**
- * 删除项目（永久删除）
+ * 删除项目（软删除，移入回收站）
  * - 项目负责人、部门管理员、系统管理员可以删除
+ * - 删除后30天内可恢复
  */
 export async function deleteProject(req: Request, res: Response) {
   const { id } = req.params
@@ -268,14 +297,15 @@ export async function deleteProject(req: Request, res: Response) {
     throw new ApiError(403, '只有项目负责人或部门管理员可以删除项目')
   }
 
-  // 永久删除项目（会级联删除相关数据）
-  await prisma.project.delete({
-    where: { id }
+  // 软删除项目（设置 deletedAt）
+  await prisma.project.update({
+    where: { id },
+    data: { deletedAt: new Date() }
   })
 
   res.json({
     success: true,
-    message: '项目已删除'
+    message: '项目已移入回收站，30天内可恢复'
   })
 }
 

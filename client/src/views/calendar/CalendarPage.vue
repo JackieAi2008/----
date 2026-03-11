@@ -82,8 +82,8 @@
     </button>
 
     <!-- 年历视图 -->
-    <div v-if="currentView === 'year'" class="flex-1 bg-white rounded-2xl border border-gray-100 overflow-auto p-4 shadow-card">
-      <div class="grid grid-cols-4 gap-4">
+    <div v-if="currentView === 'year'" class="flex-1 bg-white rounded-2xl border border-gray-100 overflow-auto p-2 sm:p-4 shadow-card">
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-4">
         <div
           v-for="month in 12"
           :key="month"

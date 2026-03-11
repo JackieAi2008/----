@@ -47,6 +47,14 @@
           </li>
           <li>
             <NavItem
+              to="/projects/deleted"
+              icon="Trash2"
+              label="回收站"
+              :active="currentRoute === '/projects/deleted'"
+            />
+          </li>
+          <li>
+            <NavItem
               to="/reports"
               icon="FileText"
               label="总结归档"
@@ -66,6 +74,14 @@
               icon="Building2"
               label="部门管理"
               :active="currentRoute === '/admin/departments'"
+            />
+          </li>
+          <li v-if="authStore.isAdmin">
+            <NavItem
+              to="/admin/users"
+              icon="Users"
+              label="用户管理"
+              :active="currentRoute === '/admin/users'"
             />
           </li>
           <li v-if="authStore.isDepartmentAdmin && !authStore.isAdmin">

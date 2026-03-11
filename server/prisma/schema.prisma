@@ -17,8 +17,8 @@ model Attachment {
   path         String
   uploaderId   String
   createdAt    DateTime @default(now())
-  User         User     @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
-  Task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploader     User     @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
@@ -30,7 +30,7 @@ model AuditLog {
   details    String?
   ipAddress  String?
   createdAt  DateTime @default(now())
-  User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
   @@index([targetType, targetId])
@@ -46,22 +46,22 @@ model Comment {
   images    String?
   createdAt DateTime  @default(now())
   deletedAt DateTime?
-  User      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  Task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
 }
 
 model Department {
-  id                                 String    @id
-  name                               String    @unique
-  description                        String?
-  adminId                            String    @unique
-  createdAt                          DateTime  @default(now())
-  updatedAt                          DateTime
-  User_Department_adminIdToUser      User      @relation("Department_adminIdToUser", fields: [adminId], references: [id], onDelete: Cascade)
-  Project                            Project[]
-  User_User_departmentIdToDepartment User[]    @relation("User_departmentIdToDepartment")
+  id          String    @id
+  name        String    @unique
+  description String?
+  adminId     String    @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  admin       User      @relation("Department_adminIdToUser", fields: [adminId], references: [id], onDelete: Cascade)
+  projects    Project[]
+  members     User[]    @relation("User_departmentIdToDepartment")
 
   @@index([name])
 }
@@ -76,7 +76,7 @@ model Notification {
   relatedId   String?
   isRead      Boolean  @default(false)
   createdAt   DateTime @default(now())
-  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([isRead])
 }
@@ -92,28 +92,28 @@ model Project {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime
   deletedAt     DateTime?
-  Department    Department?     @relation(fields: [departmentId], references: [id])
-  User          User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  ProjectInvite ProjectInvite[]
-  ProjectMember ProjectMember[]
-  Task          Task[]
-  TaskCategory  TaskCategory[]
+  department    Department?     @relation(fields: [departmentId], references: [id])
+  owner         User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  invites       ProjectInvite[]
+  members       ProjectMember[]
+  tasks         Task[]
+  categories    TaskCategory[]
 
   @@index([departmentId])
   @@index([visibility])
 }
 
 model ProjectInvite {
-  id                                 String   @id
-  projectId                          String
-  inviterId                          String
-  inviteeId                          String
-  status                             String   @default("PENDING")
-  expiresAt                          DateTime
-  createdAt                          DateTime @default(now())
-  User_ProjectInvite_inviteeIdToUser User     @relation("ProjectInvite_inviteeIdToUser", fields: [inviteeId], references: [id], onDelete: Cascade)
-  User_ProjectInvite_inviterIdToUser User     @relation("ProjectInvite_inviterIdToUser", fields: [inviterId], references: [id], onDelete: Cascade)
-  Project                            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id         String   @id
+  projectId  String
+  inviterId  String
+  inviteeId  String
+  status     String   @default("PENDING")
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  invitee    User     @relation("ProjectInvite_inviteeIdToUser", fields: [inviteeId], references: [id], onDelete: Cascade)
+  inviter    User     @relation("ProjectInvite_inviterIdToUser", fields: [inviterId], references: [id], onDelete: Cascade)
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([status])
 }
@@ -124,8 +124,8 @@ model ProjectMember {
   userId    String
   role      String   @default("MEMBER")
   joinedAt  DateTime @default(now())
-  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  Project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
 }
@@ -138,7 +138,7 @@ model PushSubscription {
   userAgent String?
   createdAt DateTime @default(now())
   updatedAt DateTime
-  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -149,43 +149,45 @@ model SecurityAnswer {
   questionIndex Int
   answer        String
   createdAt     DateTime @default(now())
-  User          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, questionIndex])
 }
 
 model Task {
-  id                         String             @id
-  projectId                  String
-  title                      String
-  description                String?
-  startDate                  DateTime?
-  dueDate                    DateTime
-  categoryId                 String?
-  assigneeId                 String
-  priority                   String             @default("MEDIUM")
-  status                     String             @default("TODO")
-  deliverable                String?
-  tags                       String?
-  reminder                   String?
-  repeat                     String?
-  creatorId                  String
-  isArchived                 Boolean            @default(false)
-  archivedAt                 DateTime?
-  createdAt                  DateTime           @default(now())
-  updatedAt                  DateTime
-  deletedAt                  DateTime?
-  Attachment                 Attachment[]
-  Comment                    Comment[]
-  User_Task_creatorIdToUser  User               @relation("Task_creatorIdToUser", fields: [creatorId], references: [id], onDelete: Cascade)
-  User_Task_assigneeIdToUser User               @relation("Task_assigneeIdToUser", fields: [assigneeId], references: [id], onDelete: Cascade)
-  TaskCategory               TaskCategory?      @relation(fields: [categoryId], references: [id])
-  Project                    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  TaskCollaborator           TaskCollaborator[]
+  id             String             @id
+  projectId      String
+  title          String
+  description    String?
+  startDate      DateTime?
+  dueDate        DateTime
+  categoryId     String?
+  assigneeId     String
+  priority       String             @default("MEDIUM")
+  status         String             @default("TODO")
+  visibility     String             @default("PRIVATE")  // PUBLIC/PRIVATE - 任务可见性
+  deliverable    String?
+  tags           String?
+  reminder       String?
+  repeat         String?
+  creatorId      String
+  isArchived     Boolean            @default(false)
+  archivedAt     DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime
+  deletedAt      DateTime?
+  attachments    Attachment[]
+  comments       Comment[]
+  creator        User               @relation("Task_creatorIdToUser", fields: [creatorId], references: [id], onDelete: Cascade)
+  assignee       User               @relation("Task_assigneeIdToUser", fields: [assigneeId], references: [id], onDelete: Cascade)
+  category       TaskCategory?      @relation(fields: [categoryId], references: [id])
+  project        Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  collaborators  TaskCollaborator[]
 
   @@index([isArchived])
   @@index([status])
   @@index([dueDate])
+  @@index([visibility])
 }
 
 model TaskCategory {
@@ -195,17 +197,17 @@ model TaskCategory {
   color        String
   isSystem     Boolean        @default(false)
   createdAt    DateTime       @default(now())
-  Task         Task[]
-  Project      Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  TaskTemplate TaskTemplate[]
+  tasks        Task[]
+  project      Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  templates    TaskTemplate[]
 }
 
 model TaskCollaborator {
   id     String @id
   taskId String
   userId String
-  User   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  Task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, userId])
 }
@@ -220,8 +222,8 @@ model TaskTemplate {
   creatorId       String
   createdAt       DateTime      @default(now())
   updatedAt       DateTime
-  TaskCategory    TaskCategory? @relation(fields: [categoryId], references: [id])
-  User            User          @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  category        TaskCategory? @relation(fields: [categoryId], references: [id])
+  creator         User          @relation(fields: [creatorId], references: [id], onDelete: Cascade)
 
   @@index([creatorId])
 }
@@ -238,22 +240,22 @@ model User {
   departmentId                                String?
   createdAt                                   DateTime           @default(now())
   updatedAt                                   DateTime
-  Attachment                                  Attachment[]
-  AuditLog                                    AuditLog[]
-  Comment                                     Comment[]
-  Department_Department_adminIdToUser         Department?        @relation("Department_adminIdToUser")
-  Notification                                Notification[]
-  Project                                     Project[]
-  ProjectInvite_ProjectInvite_inviteeIdToUser ProjectInvite[]    @relation("ProjectInvite_inviteeIdToUser")
-  ProjectInvite_ProjectInvite_inviterIdToUser ProjectInvite[]    @relation("ProjectInvite_inviterIdToUser")
-  ProjectMember                               ProjectMember[]
-  PushSubscription                            PushSubscription[]
-  SecurityAnswer                              SecurityAnswer[]
-  Task_Task_creatorIdToUser                   Task[]             @relation("Task_creatorIdToUser")
-  Task_Task_assigneeIdToUser                  Task[]             @relation("Task_assigneeIdToUser")
-  TaskCollaborator                            TaskCollaborator[]
-  TaskTemplate                                TaskTemplate[]
-  Department_User_departmentIdToDepartment    Department?        @relation("User_departmentIdToDepartment", fields: [departmentId], references: [id])
+  attachments                                 Attachment[]
+  auditLogs                                   AuditLog[]
+  comments                                    Comment[]
+  managedDepartment                           Department?        @relation("Department_adminIdToUser")
+  notifications                               Notification[]
+  ownedProjects                               Project[]
+  receivedInvites                             ProjectInvite[]    @relation("ProjectInvite_inviteeIdToUser")
+  sentInvites                                 ProjectInvite[]    @relation("ProjectInvite_inviterIdToUser")
+  projectMemberships                          ProjectMember[]
+  pushSubscriptions                           PushSubscription[]
+  securityAnswers                             SecurityAnswer[]
+  createdTasks                                Task[]             @relation("Task_creatorIdToUser")
+  assignedTasks                               Task[]             @relation("Task_assigneeIdToUser")
+  taskCollaborations                          TaskCollaborator[]
+  taskTemplates                               TaskTemplate[]
+  department                                  Department?        @relation("User_departmentIdToDepartment", fields: [departmentId], references: [id])
 
   @@index([departmentId])
 }

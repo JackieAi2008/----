@@ -4,10 +4,8 @@
 import { Response } from 'express'
 import path from 'path'
 import fs from 'fs'
-import { PrismaClient } from '@prisma/client'
+import prisma from '../config/database.js'
 import { AuthRequest } from '../middlewares/auth.js'
-
-const prisma = new PrismaClient()
 
 // 附件存储目录
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'attachments')

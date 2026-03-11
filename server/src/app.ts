@@ -26,6 +26,7 @@ import tagRoutes from './routes/tags.js'
 import templateRoutes from './routes/templates.js'
 import departmentRoutes from './routes/departments.js'
 import adminRoutes from './routes/admin.js'
+import calendarRoutes from './routes/calendar.js'
 
 // 导入中间件
 import { errorHandler } from './middlewares/errorHandler.js'
@@ -65,6 +66,7 @@ app.use('/api/tags', tagRoutes)
 app.use('/api/templates', templateRoutes)
 app.use('/api/departments', departmentRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/calendar', calendarRoutes)
 
 // 健康检查
 app.get('/api/health', (_req, res) => {

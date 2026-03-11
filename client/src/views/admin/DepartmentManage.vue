@@ -7,24 +7,28 @@
         :value="dashboard?.overview.departments || 0"
         label="部门"
         color="blue"
+        to="/admin/departments"
       />
       <StatisticsCard
         :icon="Users"
         :value="dashboard?.overview.users || 0"
         label="用户"
         color="green"
+        to="/admin/users"
       />
       <StatisticsCard
         :icon="FolderKanban"
         :value="dashboard?.overview.projects || 0"
         label="项目"
         color="purple"
+        to="/projects"
       />
       <StatisticsCard
         :icon="CheckCircle"
         :value="dashboard?.overview.tasks || 0"
         label="任务"
         color="yellow"
+        to="/calendar"
       />
     </div>
 
@@ -102,6 +106,52 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 删除部门确认弹窗 -->
+    <div
+      v-if="deletingDepartment"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click.self="cancelDelete"
+    >
+      <div class="bg-white rounded-lg w-full max-w-md p-6">
+        <h2 class="text-lg font-semibold mb-4">删除部门</h2>
+        <p class="text-gray-600 mb-4">
+          部门「{{ deletingDepartment.name }}」中还有
+          <span class="font-medium text-gray-900">{{ deletingDepartment.memberCount }} 个成员</span> 和
+          <span class="font-medium text-gray-900">{{ deletingDepartment.projectCount }} 个项目</span>。
+        </p>
+        <p class="text-gray-600 mb-4">请选择要迁移到的目标部门：</p>
+        <select
+          v-model="targetDepartmentId"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="">请选择目标部门</option>
+          <option
+            v-for="dept in availableTargetDepartments"
+            :key="dept.id"
+            :value="dept.id"
+          >
+            {{ dept.name }}
+          </option>
+        </select>
+        <div class="flex justify-end gap-3 mt-6">
+          <button
+            type="button"
+            @click="cancelDelete"
+            class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+          >
+            取消
+          </button>
+          <button
+            @click="confirmDelete"
+            :disabled="!targetDepartmentId || deleting"
+            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+          >
+            {{ deleting ? '删除中...' : '确认删除' }}
+          </button>
         </div>
       </div>
     </div>
@@ -200,8 +250,11 @@ const departmentStore = useDepartmentStore()
 
 const loading = ref(true)
 const submitting = ref(false)
+const deleting = ref(false)
 const showCreateModal = ref(false)
 const editingDepartment = ref<Department | null>(null)
+const deletingDepartment = ref<DepartmentListItem | null>(null)
+const targetDepartmentId = ref('')
 const availableUsers = ref<User[]>([])
 const dashboard = ref<AdminDashboard | null>(null)
 
@@ -212,6 +265,12 @@ const form = ref({
 })
 
 const departments = computed(() => departmentStore.departments)
+
+// 可选的目标部门列表（排除要删除的部门）
+const availableTargetDepartments = computed(() => {
+  if (!deletingDepartment.value) return []
+  return departmentList.value.filter(d => d.id !== deletingDepartment.value?.id)
+})
 
 // 合并部门列表数据
 const departmentList = computed<DepartmentListItem[]>(() => {
@@ -299,18 +358,45 @@ async function handleSubmit() {
 }
 
 // 删除部门
-async function handleDelete(dept: DepartmentListItem) {
-  if (!confirm(`确定要删除部门「${dept.name}」吗？该操作不可撤销。`)) {
-    return
+function handleDelete(dept: DepartmentListItem) {
+  // 如果部门有成员或项目，显示目标部门选择弹窗
+  if (dept.memberCount > 0 || dept.projectCount > 0) {
+    deletingDepartment.value = dept
+    targetDepartmentId.value = ''
+  } else {
+    // 直接删除空部门
+    if (!confirm(`确定要删除部门「${dept.name}」吗？该操作不可撤销。`)) {
+      return
+    }
+    deletingDepartment.value = dept
+    confirmDelete()
   }
+}
+
+// 取消删除
+function cancelDelete() {
+  deletingDepartment.value = null
+  targetDepartmentId.value = ''
+}
+
+// 确认删除
+async function confirmDelete() {
+  const dept = deletingDepartment.value
+  if (!dept) return
+
   try {
-    await departmentStore.deleteDepartment(dept.id)
+    deleting.value = true
+    await departmentStore.deleteDepartment(dept.id, targetDepartmentId.value || undefined)
+    deletingDepartment.value = null
+    targetDepartmentId.value = ''
     await departmentStore.fetchDepartments()
     // 重新获取仪表盘数据
     const result = await getAdminDashboard().catch(() => null)
     dashboard.value = result ?? null
   } catch (e) {
     console.error('删除失败:', e)
+  } finally {
+    deleting.value = false
   }
 }
 

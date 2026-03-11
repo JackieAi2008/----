@@ -485,6 +485,10 @@ async function loadData() {
       getWorkStats(range)
     ])
 
+    if (!dashboardData || !workStatsData) {
+      throw new Error('Failed to load data')
+    }
+
     // 设置统计数据
     stats.value = {
       total: dashboardData.monthStats.total,
@@ -494,12 +498,12 @@ async function loadData() {
     }
 
     // 设置状态统计
-    const statusData = workStatsData.statusStats
+    const statusData = workStatsData.statusStats || []
     statusCounts.value = {
-      TODO: statusData.find(s => s.status === 'TODO')?._count || 0,
-      IN_PROGRESS: statusData.find(s => s.status === 'IN_PROGRESS')?._count || 0,
-      DONE: statusData.find(s => s.status === 'DONE')?._count || 0,
-      CANCELLED: statusData.find(s => s.status === 'CANCELLED')?._count || 0
+      TODO: statusData.find(s => s.status === 'TODO')?.count || 0,
+      IN_PROGRESS: statusData.find(s => s.status === 'IN_PROGRESS')?.count || 0,
+      DONE: statusData.find(s => s.status === 'DONE')?.count || 0,
+      CANCELLED: statusData.find(s => s.status === 'CANCELLED')?.count || 0
     }
 
     // 更新总数
@@ -507,7 +511,7 @@ async function loadData() {
     stats.value.inProgress = statusCounts.value.IN_PROGRESS
 
     // 设置项目统计
-    projectStats.value = workStatsData.projectStats
+    projectStats.value = workStatsData.projectStats || []
 
     // 生成趋势数据（模拟最近7天）
     generateTrendData()

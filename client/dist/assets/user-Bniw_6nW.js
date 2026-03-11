@@ -1,1 +1,0 @@
-import{b as r,e as t}from"./index-bmliUrAJ.js";async function c(e,s){return(await t(`/users/${e}`,s)).data}async function p(e,s){const a={keyword:e};return s&&(a.projectId=s),(await r("/users/search",{params:a})).data??[]}export{p as s,c as u};

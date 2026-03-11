@@ -27,8 +27,9 @@ export declare function createProject(req: Request, res: Response): Promise<void
  */
 export declare function updateProject(req: Request, res: Response): Promise<void>;
 /**
- * 删除项目（永久删除）
+ * 删除项目（软删除，移入回收站）
  * - 项目负责人、部门管理员、系统管理员可以删除
+ * - 删除后30天内可恢复
  */
 export declare function deleteProject(req: Request, res: Response): Promise<void>;
 /**

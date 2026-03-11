@@ -5,6 +5,14 @@ import { get, put } from '@/utils/request'
 import type { User } from '@/types/user'
 
 /**
+ * 获取用户列表（管理员）
+ */
+export async function getUsers(): Promise<User[]> {
+  const response = await get<User[]>('/users')
+  return response.data ?? []
+}
+
+/**
  * 获取用户信息
  */
 export async function getUser(id: string): Promise<User> {

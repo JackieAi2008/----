@@ -14,6 +14,9 @@ export type Reminder = 'FIFTEEN_MIN' | 'ONE_HOUR' | 'ONE_DAY' | 'THREE_DAYS'
 // 重复类型
 export type Repeat = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'
 
+// 任务可见性
+export type TaskVisibility = 'PUBLIC' | 'PRIVATE'
+
 // 任务基础信息
 export interface Task {
   id: string
@@ -26,6 +29,7 @@ export interface Task {
   assigneeId: string
   priority: Priority
   status: TaskStatus
+  visibility: TaskVisibility  // 新增：任务可见性
   deliverable: string | null
   tags: string[] | null
   reminder: Reminder | null
@@ -122,6 +126,7 @@ export interface CreateTaskRequest {
   categoryId?: string
   assigneeId: string
   priority?: Priority
+  visibility?: TaskVisibility  // 新增
   deliverable?: string
   tags?: string[]
   reminder?: Reminder
@@ -139,6 +144,7 @@ export interface UpdateTaskRequest {
   assigneeId?: string
   priority?: Priority
   status?: TaskStatus
+  visibility?: TaskVisibility  // 新增
   deliverable?: string
   tags?: string[]
   reminder?: Reminder

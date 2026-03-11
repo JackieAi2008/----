@@ -1,1 +1,0 @@
-import{b as n}from"./index-bmliUrAJ.js";async function r(){return(await n("/dashboard")).data}async function d(t){const e=new URLSearchParams;t!=null&&t.startDate&&e.append("startDate",t.startDate),t!=null&&t.endDate&&e.append("endDate",t.endDate);const o=`/dashboard/stats${e.toString()?"?"+e.toString():""}`;return(await n(o)).data}export{d as a,r as g};

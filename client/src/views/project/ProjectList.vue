@@ -49,7 +49,7 @@
           <!-- 删除按钮 -->
           <button
             @click.stop="confirmDelete(project)"
-            class="absolute top-3 left-3 p-2 bg-white/90 rounded-lg shadow opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 transition-all duration-200"
+            class="absolute top-3 left-3 p-2 bg-white/90 rounded-lg shadow hover:bg-red-50 hover:text-red-600 transition-all duration-200"
             title="删除项目"
           >
             <Trash2 class="w-4 h-4" />
@@ -60,6 +60,13 @@
             :class="project.visibility === 'PUBLIC' ? 'bg-green-500/90 text-white' : 'bg-gray-900/70 text-white'"
           >
             {{ project.visibility === 'PUBLIC' ? '公开' : '私密' }}
+          </span>
+          <!-- 部门标签 -->
+          <span
+            v-if="project.department"
+            class="absolute top-3 right-16 px-2.5 py-1 text-xs rounded-lg font-medium bg-blue-500/90 text-white"
+          >
+            {{ project.department.name }}
           </span>
         </div>
 
@@ -135,8 +142,11 @@
               <Trash2 class="w-7 h-7 text-red-600" />
             </div>
             <h3 class="text-lg font-semibold text-gray-800 mb-2">确认删除项目？</h3>
+            <p class="text-red-500 text-sm mb-2 font-medium">
+              请谨慎删除，删除后无法恢复
+            </p>
             <p class="text-gray-500 text-sm mb-6">
-              项目「{{ projectToDelete?.name }}」将移入回收站，30天内可恢复
+              项目「{{ projectToDelete?.name }}」及其所有任务将被永久删除
             </p>
             <div class="flex gap-3">
               <button

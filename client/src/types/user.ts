@@ -75,7 +75,7 @@ export interface SecurityQuestion {
 
 // 预设安全问题列表
 export const SECURITY_QUESTIONS: SecurityQuestion[] = [
-  { index: 0, question: '您的母亲姓名是什么？' },
+  { index: 0, question: '您的幸运数字是什么？' },
   { index: 1, question: '您的出生城市是哪里？' },
   { index: 2, question: '您的第一所学校名称是什么？' },
   { index: 3, question: '您最喜爱的电影是什么？' }

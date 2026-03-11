@@ -41,9 +41,12 @@ request.interceptors.response.use(
       const { status } = error.response
 
       if (status === 401) {
-        // 未授权，清除token并跳转登录页
+        // 未授权，清除token
         localStorage.removeItem('token')
-        window.location.href = '/login'
+        // 只有不在登录页和注册页时才跳转登录页
+        if (!window.location.pathname.match(/^\/(login|register|forgot-password)/)) {
+          window.location.href = '/login'
+        }
       } else if (status === 403) {
         // 无权限
         devLog.error('无权限访问')

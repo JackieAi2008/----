@@ -46,6 +46,10 @@ export interface Task {
     id: string
     nickname: string
     avatar: string | null
+    department?: {
+      id: string
+      name: string
+    }
   }
   creator?: {
     id: string

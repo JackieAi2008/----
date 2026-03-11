@@ -108,9 +108,17 @@
           >
             <div class="flex-1">
               <h4 class="font-medium text-gray-800">{{ task.title }}</h4>
-              <p class="text-sm text-gray-500 mt-1">
-                截止日期：{{ formatDateTime(task.dueDate) }}
-              </p>
+              <div class="flex items-center gap-4 mt-1">
+                <p class="text-sm text-gray-500">
+                  截止日期：{{ formatDateTime(task.dueDate) }}
+                </p>
+                <p v-if="task.assignee" class="text-sm text-gray-500">
+                  负责人：{{ task.assignee.nickname }}
+                  <span v-if="task.assignee.department" class="text-xs text-gray-400">
+                    [{{ task.assignee.department.name }}]
+                  </span>
+                </p>
+              </div>
             </div>
             <div class="flex items-center gap-3">
               <span
@@ -218,12 +226,12 @@
                 </div>
                 <div>
                   <p class="font-medium text-gray-800">{{ user.nickname }}</p>
-                  <p class="text-xs text-gray-500">{{ user.email }}</p>
+                  <p class="text-xs text-gray-500">{{ user.department?.name || '未分配部门' }}</p>
                 </div>
               </div>
             </div>
             <div v-if="selectedUser" class="p-3 bg-blue-50 rounded-lg">
-              <p class="text-sm">已选择: {{ selectedUser.nickname }} ({{ selectedUser.email }})</p>
+              <p class="text-sm">已选择: {{ selectedUser.nickname }} ({{ selectedUser.department?.name || '未分配部门' }})</p>
             </div>
           </div>
           <div class="flex justify-end gap-3 mt-6">
@@ -464,7 +472,7 @@ async function handleSearchUsers() {
   }
 
   try {
-    searchResults.value = await searchUsers(searchKeyword.value)
+    searchResults.value = await searchUsers(searchKeyword.value, projectId.value)
   } catch {
     searchResults.value = []
   }

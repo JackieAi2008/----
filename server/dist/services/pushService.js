@@ -3,6 +3,7 @@
  * 使用 Web Push API 实现浏览器推送通知
  */
 import prisma from '../config/database.js';
+import { logger } from '../utils/logger.js';
 // VAPID 配置（生产环境需要生成并配置到环境变量）
 // 生成命令: npx web-push generate-vapid-keys
 export const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
@@ -84,11 +85,11 @@ export async function sendPushToUser(userId, payload) {
             // 由于 web-push 是可选依赖，这里提供接口
             // 实际发送逻辑需要在安装 web-push 后实现
             // 模拟发送成功
-            console.log(`[Push] 发送通知给 ${userId}: ${payload.title}`);
+            logger.info(`[Push] 发送通知给 ${userId}: ${payload.title}`);
             success++;
         }
         catch (error) {
-            console.error(`[Push] 发送失败:`, error);
+            logger.error(`[Push] 发送失败:`, error);
             failed++;
             // 如果订阅失效，删除它
             if (error instanceof Error && error.message.includes('410')) {

@@ -3,7 +3,7 @@
     <!-- 侧边栏 -->
     <aside
       class="w-64 flex flex-col fixed h-full z-30 transition-transform duration-300 ease-in-out sidebar-gradient"
-      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+      :class="{ '-translate-x-full md:translate-x-0': !sidebarOpen }"
     >
       <!-- Logo -->
       <div class="p-5 border-b border-white/10">
@@ -43,14 +43,6 @@
               icon="FolderKanban"
               label="项目"
               :active="currentRoute.startsWith('/projects') && currentRoute !== '/projects/deleted'"
-            />
-          </li>
-          <li>
-            <NavItem
-              to="/projects/deleted"
-              icon="Trash2"
-              label="回收站"
-              :active="currentRoute === '/projects/deleted'"
             />
           </li>
           <li>
@@ -106,7 +98,9 @@
               {{ authStore.user?.nickname || '用户' }}
             </p>
             <p class="text-xs text-blue-200/70 truncate">
-              {{ authStore.user?.email }}
+              {{ authStore.user?.department?.name || '未分配部门' }}
+              <span v-if="authStore.isAdmin" class="text-yellow-300">(管理员)</span>
+              <span v-else-if="authStore.isDepartmentAdmin" class="text-green-300">(部门管理员)</span>
             </p>
           </div>
           <button

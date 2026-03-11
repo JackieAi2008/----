@@ -417,6 +417,7 @@
               <th class="px-4 py-3 font-medium w-28">截止日期</th>
               <th class="px-4 py-3 font-medium w-24">状态</th>
               <th class="px-4 py-3 font-medium w-20">优先级</th>
+              <th class="px-4 py-3 font-medium w-32">负责人</th>
             </tr>
           </thead>
           <tbody>
@@ -470,6 +471,15 @@
                 >
                   {{ getPriorityLabel(task.priority) }}
                 </span>
+              </td>
+              <td class="px-4 py-3 cursor-pointer" @click="handleTaskClick(task)">
+                <div v-if="task.assignee" class="flex items-center gap-1">
+                  <span class="text-sm text-gray-700">{{ task.assignee.nickname }}</span>
+                  <span v-if="task.assignee.department" class="text-xs text-gray-400">
+                    [{{ task.assignee.department.name }}]
+                  </span>
+                </div>
+                <span v-else class="text-sm text-gray-400">未分配</span>
               </td>
             </tr>
           </tbody>

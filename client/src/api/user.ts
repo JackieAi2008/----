@@ -27,7 +27,11 @@ export async function updateUser(id: string, data: {
 /**
  * 搜索用户
  */
-export async function searchUsers(keyword: string): Promise<User[]> {
-  const response = await get<User[]>('/users/search', { params: { keyword } })
+export async function searchUsers(keyword: string, projectId?: string): Promise<User[]> {
+  const params: Record<string, string> = { keyword }
+  if (projectId) {
+    params.projectId = projectId
+  }
+  const response = await get<User[]>('/users/search', { params })
   return response.data ?? []
 }

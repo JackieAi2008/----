@@ -127,10 +127,23 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
-  // 已登录但访问登录页
+  // 已登录但访问登录页 - 需要验证token有效性
   if ((to.path === '/login' || to.path === '/register') && token) {
-    next('/')
-    return
+    // 验证token是否仍然有效
+    try {
+      const authStore = useAuthStore()
+      if (!authStore.user) {
+        await authStore.fetchCurrentUser()
+      }
+      // token有效，重定向到首页
+      next('/')
+      return
+    } catch {
+      // token无效，清除并允许访问登录/注册页
+      localStorage.removeItem('token')
+      next()
+      return
+    }
   }
 
   // 检查部门管理员权限

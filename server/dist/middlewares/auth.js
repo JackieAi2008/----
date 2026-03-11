@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import prisma from '../config/database.js';
 import { jwtConfig } from '../config/jwt.js';
 /**
  * 验证JWT Token中间件
@@ -69,5 +70,59 @@ export function requireAdmin(req, res, next) {
         });
     }
     next();
+}
+/**
+ * 部门管理员权限中间件（系统管理员或部门管理员）
+ */
+export async function requireDepartmentAdmin(req, res, next) {
+    try {
+        // 系统管理员直接通过
+        if (req.userRole === 'ADMIN') {
+            return next();
+        }
+        // 检查是否为部门管理员
+        if (!req.userId) {
+            return res.status(401).json({
+                success: false,
+                message: '未登录'
+            });
+        }
+        const managedDepartment = await prisma.department.findUnique({
+            where: { adminId: req.userId }
+        });
+        if (!managedDepartment) {
+            return res.status(403).json({
+                success: false,
+                message: '需要部门管理员权限'
+            });
+        }
+        req.departmentId = managedDepartment.id;
+        next();
+    }
+    catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: '权限验证失败'
+        });
+    }
+}
+/**
+ * 检查用户是否为部门管理员（指定部门）
+ */
+export async function isDepartmentAdmin(userId, departmentId) {
+    const department = await prisma.department.findFirst({
+        where: { id: departmentId, adminId: userId }
+    });
+    return !!department;
+}
+/**
+ * 检查用户是否为系统管理员
+ */
+export async function isSystemAdmin(userId) {
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true }
+    });
+    return user?.isAdmin ?? false;
 }
 //# sourceMappingURL=auth.js.map

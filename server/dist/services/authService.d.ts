@@ -4,6 +4,7 @@ interface RegisterData {
     nickname: string;
     securityQuestion: number;
     securityAnswer: string;
+    departmentId?: string;
 }
 /**
  * 用户登录
@@ -17,6 +18,16 @@ export declare function login(email: string, password: string): Promise<{
         avatar: string | null;
         bio: string | null;
         isAdmin: boolean;
+        isDepartmentAdmin: boolean;
+        departmentId: string | null;
+        department: {
+            id: string;
+            name: string;
+        } | null;
+        managedDepartment: {
+            id: string;
+            name: string;
+        } | null;
     };
 }>;
 /**
@@ -31,6 +42,12 @@ export declare function register(data: RegisterData): Promise<{
         avatar: string | null;
         bio: string | null;
         isAdmin: boolean;
+        isDepartmentAdmin: boolean;
+        departmentId: string | null;
+        department: {
+            id: string;
+            name: string;
+        } | null;
     };
 }>;
 /**

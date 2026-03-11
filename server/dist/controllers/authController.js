@@ -16,13 +16,14 @@ export async function login(req, res) {
  * 用户注册
  */
 export async function register(req, res) {
-    const { email, password, nickname, securityQuestion, securityAnswer } = req.body;
+    const { email, password, nickname, securityQuestion, securityAnswer, departmentId } = req.body;
     const result = await authService.register({
         email,
         password,
         nickname,
         securityQuestion,
-        securityAnswer
+        securityAnswer,
+        departmentId
     });
     res.status(201).json({
         success: true,
@@ -44,6 +45,10 @@ export async function getCurrentUser(req, res) {
             bio: true,
             isAdmin: true,
             isBanned: true,
+            departmentId: true,
+            department: {
+                select: { id: true, name: true }
+            },
             createdAt: true,
             updatedAt: true
         }
@@ -51,9 +56,18 @@ export async function getCurrentUser(req, res) {
     if (!user) {
         throw new ApiError(404, '用户不存在');
     }
+    // 检查是否为部门管理员
+    const managedDepartment = await prisma.department.findUnique({
+        where: { adminId: userId },
+        select: { id: true, name: true }
+    });
     res.json({
         success: true,
-        data: user
+        data: {
+            ...user,
+            isDepartmentAdmin: !!managedDepartment,
+            managedDepartment
+        }
     });
 }
 /**

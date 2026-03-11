@@ -149,69 +149,67 @@ export async function updateUser(req: Request, res: Response) {
 }
 
 /**
- * 搜索用户
+ * 搜索用户（用于跨部门邀请）
+ * 只返回基本信息：id, nickname, department
  */
 export async function searchUsers(req: Request, res: Response) {
-  const { keyword, departmentId } = req.query
-  const currentUserId = (req as AuthRequest).userId
+  const userId = (req as AuthRequest).userId
+  const { keyword, projectId } = req.query
 
-  if (!keyword || typeof keyword !== 'string') {
-    throw new ApiError(400, '请输入搜索关键词')
+  if (!keyword || typeof keyword !== 'string' || keyword.length < 2) {
+    throw new ApiError(400, '搜索关键词至少2个字符')
   }
 
   // 获取当前用户信息
   const currentUser = await prisma.user.findUnique({
-    where: { id: currentUserId },
+    where: { id: userId },
     select: { isAdmin: true, departmentId: true }
   })
 
-  // 构建查询条件
-  const where: {
-    OR: Array<{ nickname: { contains: string } } | { email: { contains: string } }>
+  // 构建搜索条件
+  const whereClause: {
     isBanned: boolean
-    departmentId?: string | null
+    OR: Array<{ nickname: { contains: string } } | { email: { contains: string } }>
+    departmentId?: { not: string }
+    NOT?: { projectMembers: { some: { projectId: string } } }
   } = {
+    isBanned: false,
     OR: [
       { nickname: { contains: keyword } },
       { email: { contains: keyword } }
-    ],
-    isBanned: false
+    ]
   }
 
-  // 如果指定了部门筛选
-  if (departmentId && typeof departmentId === 'string') {
-    where.departmentId = departmentId
+  // 如果不是系统管理员，排除自己部门的人（他们可以直接看到）
+  if (!currentUser?.isAdmin && currentUser?.departmentId) {
+    whereClause.departmentId = { not: currentUser.departmentId }
+  }
+
+  // 如果指定了项目ID，排除已经是项目成员的人
+  if (projectId && typeof projectId === 'string') {
+    whereClause.NOT = {
+      projectMembers: {
+        some: { projectId }
+      }
+    }
   }
 
   const users = await prisma.user.findMany({
-    where,
+    where: whereClause,
     select: {
       id: true,
       nickname: true,
-      avatar: true,
       email: true,
+      avatar: true,
       department: {
         select: { id: true, name: true }
       }
     },
-    take: 10
+    take: 20
   })
-
-  // 如果不是系统管理员且搜索的是其他部门成员，只返回基本信息
-  const isCrossDepartment = currentUser?.departmentId && currentUser.departmentId !== departmentId
 
   res.json({
     success: true,
-    data: users.map(user => {
-      // 跨部门搜索只返回基本信息
-      if (!currentUser?.isAdmin && isCrossDepartment) {
-        return {
-          id: user.id,
-          nickname: user.nickname,
-          department: user.department
-        }
-      }
-      return user
-    })
+    data: users
   })
 }

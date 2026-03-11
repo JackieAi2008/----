@@ -19,6 +19,11 @@ const updateProjectValidation = [
     body('visibility').optional().isIn(['PUBLIC', 'PRIVATE']).withMessage('可见性只能是PUBLIC或PRIVATE'),
     validate
 ];
+// 移交项目验证规则
+const transferProjectValidation = [
+    body('newOwnerId').notEmpty().withMessage('请选择新负责人'),
+    validate
+];
 /**
  * @route   GET /api/projects
  * @desc    获取当前用户的项目列表
@@ -109,5 +114,11 @@ router.post('/:id/invite/accept', auth, projectController.acceptInvite);
  * @access  Private
  */
 router.post('/:id/invite/reject', auth, projectController.rejectInvite);
+/**
+ * @route   PUT /api/projects/:id/transfer
+ * @desc    移交项目负责人
+ * @access  Private
+ */
+router.put('/:id/transfer', auth, transferProjectValidation, projectController.transferProject);
 export default router;
 //# sourceMappingURL=projects.js.map

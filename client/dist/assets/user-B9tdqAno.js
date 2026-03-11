@@ -1,1 +1,0 @@
-import{b as a,e as r}from"./index-C06-2NE8.js";async function o(s,e){return(await r(`/users/${s}`,e)).data}async function p(s){return(await a("/users/search",{params:{keyword:s}})).data??[]}export{p as s,o as u};

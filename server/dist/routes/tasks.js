@@ -29,6 +29,18 @@ const updateStatusValidation = [
     body('status').isIn(['TODO', 'IN_PROGRESS', 'DONE', 'CANCELLED']).withMessage('无效的任务状态'),
     validate
 ];
+// 批量更新任务验证规则
+const batchUpdateValidation = [
+    body('taskIds').isArray({ min: 1 }).withMessage('请选择要更新的任务'),
+    body('status').optional().isIn(['TODO', 'IN_PROGRESS', 'DONE', 'CANCELLED']).withMessage('无效的任务状态'),
+    body('priority').optional().isIn(['HIGH', 'MEDIUM', 'LOW']).withMessage('无效的优先级'),
+    validate
+];
+// 批量删除任务验证规则
+const batchDeleteValidation = [
+    body('taskIds').isArray({ min: 1 }).withMessage('请选择要删除的任务'),
+    validate
+];
 /**
  * @route   GET /api/tasks
  * @desc    获取任务列表
@@ -41,6 +53,42 @@ router.get('/', auth, taskController.getTasks);
  * @access  Private
  */
 router.get('/categories', auth, taskController.getTaskCategories);
+/**
+ * @route   GET /api/tasks/tags
+ * @desc    获取所有标签
+ * @access  Private
+ */
+router.get('/tags', auth, taskController.getAllTags);
+/**
+ * @route   GET /api/tasks/archived
+ * @desc    获取已归档任务列表
+ * @access  Private
+ */
+router.get('/archived', auth, taskController.getArchivedTasks);
+/**
+ * @route   PUT /api/tasks/batch
+ * @desc    批量更新任务
+ * @access  Private
+ */
+router.put('/batch', auth, batchUpdateValidation, taskController.batchUpdateTasks);
+/**
+ * @route   DELETE /api/tasks/batch
+ * @desc    批量删除任务
+ * @access  Private
+ */
+router.delete('/batch', auth, batchDeleteValidation, taskController.batchDeleteTasks);
+/**
+ * @route   POST /api/tasks/batch/archive
+ * @desc    批量归档任务
+ * @access  Private
+ */
+router.post('/batch/archive', auth, batchDeleteValidation, taskController.batchArchiveTasks);
+/**
+ * @route   POST /api/tasks/archive-completed
+ * @desc    归档已完成超过30天的任务
+ * @access  Private
+ */
+router.post('/archive-completed', auth, taskController.archiveCompletedTasks);
 /**
  * @route   POST /api/tasks/categories
  * @desc    创建任务类别
@@ -65,6 +113,12 @@ router.post('/', auth, createTaskValidation, taskController.createTask);
  * @access  Private (需要编辑权限)
  */
 router.put('/:id', auth, requireTaskPermission(TaskAction.EDIT), updateTaskValidation, taskController.updateTask);
+/**
+ * @route   PUT /api/tasks/:id/tags
+ * @desc    更新任务标签
+ * @access  Private (需要编辑权限)
+ */
+router.put('/:id/tags', auth, requireTaskPermission(TaskAction.EDIT), taskController.updateTaskTags);
 /**
  * @route   PATCH /api/tasks/:id/status
  * @desc    更新任务状态（负责人、协作者也可以更新）
@@ -101,5 +155,11 @@ router.post('/:id/comments', auth, taskController.addComment);
  * @access  Private
  */
 router.delete('/:id/comments/:commentId', auth, taskController.deleteComment);
+/**
+ * @route   PUT /api/tasks/:id/unarchive
+ * @desc    恢复归档任务
+ * @access  Private
+ */
+router.put('/:id/unarchive', auth, taskController.unarchiveTask);
 export default router;
 //# sourceMappingURL=tasks.js.map

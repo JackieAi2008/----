@@ -1,12 +1,27 @@
 import prisma from '../config/database.js';
 import { ApiError } from '../middlewares/errorHandler.js';
 import { getTaskPermissions } from '../middlewares/taskPermission.js';
+import { createNextRecurringTask } from '../services/recurringTaskService.js';
+// 用户选择字段（包含部门信息）
+const userSelectWithDept = {
+    id: true,
+    nickname: true,
+    avatar: true,
+    department: {
+        select: { id: true, name: true }
+    }
+};
 /**
  * 获取任务列表
  */
 export async function getTasks(req, res) {
     const userId = req.userId;
     const { projectId, assigneeId, status, startDate, endDate } = req.query;
+    // 获取当前用户信息
+    const currentUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true, departmentId: true }
+    });
     // 构建查询条件
     const where = {
         deletedAt: null
@@ -31,21 +46,27 @@ export async function getTasks(req, res) {
     }
     // 如果没有指定项目，只返回用户有权限的任务
     if (!projectId) {
-        where.OR = [
-            { assigneeId: userId },
-            { collaborators: { some: { userId } } },
-            { project: { members: { some: { userId } } } }
-        ];
+        if (currentUser?.isAdmin) {
+            // 系统管理员可以看到所有任务
+        }
+        else {
+            where.OR = [
+                { assigneeId: userId },
+                { collaborators: { some: { userId } } },
+                { project: { members: { some: { userId } } } },
+                { project: { departmentId: currentUser?.departmentId } }
+            ];
+        }
     }
     const tasks = await prisma.task.findMany({
         where,
         include: {
             project: {
-                select: { id: true, name: true }
+                select: { id: true, name: true, departmentId: true, department: { select: { id: true, name: true } } }
             },
             category: true,
             assignee: {
-                select: { id: true, nickname: true, avatar: true }
+                select: userSelectWithDept
             },
             creator: {
                 select: { id: true, nickname: true }
@@ -53,7 +74,7 @@ export async function getTasks(req, res) {
             collaborators: {
                 include: {
                     user: {
-                        select: { id: true, nickname: true, avatar: true }
+                        select: userSelectWithDept
                     }
                 }
             }
@@ -75,19 +96,19 @@ export async function getTaskById(req, res) {
         where: { id, deletedAt: null },
         include: {
             project: {
-                select: { id: true, name: true, ownerId: true }
+                select: { id: true, name: true, ownerId: true, departmentId: true, department: { select: { id: true, name: true } } }
             },
             category: true,
             assignee: {
-                select: { id: true, nickname: true, avatar: true }
+                select: userSelectWithDept
             },
             creator: {
-                select: { id: true, nickname: true }
+                select: { id: true, nickname: true, department: { select: { id: true, name: true } } }
             },
             collaborators: {
                 include: {
                     user: {
-                        select: { id: true, nickname: true, avatar: true }
+                        select: userSelectWithDept
                     }
                 }
             },
@@ -95,7 +116,7 @@ export async function getTaskById(req, res) {
                 where: { deletedAt: null },
                 include: {
                     user: {
-                        select: { id: true, nickname: true, avatar: true }
+                        select: { id: true, nickname: true, avatar: true, department: { select: { id: true, name: true } } }
                     }
                 },
                 orderBy: { createdAt: 'desc' }
@@ -103,7 +124,7 @@ export async function getTaskById(req, res) {
             attachments: {
                 include: {
                     uploader: {
-                        select: { id: true, nickname: true }
+                        select: { id: true, nickname: true, department: { select: { id: true, name: true } } }
                     }
                 }
             }
@@ -150,7 +171,7 @@ export async function createTask(req, res) {
             priority: priority || 'MEDIUM',
             status: 'TODO',
             deliverable,
-            tags: tags ? JSON.stringify(tags) : null,
+            tags: tags || [],
             reminder,
             repeat,
             creatorId: userId,
@@ -239,7 +260,7 @@ export async function updateTask(req, res) {
             priority,
             status,
             deliverable,
-            tags: tags ? JSON.stringify(tags) : undefined,
+            tags: tags || [],
             reminder,
             repeat
         },
@@ -253,6 +274,16 @@ export async function updateTask(req, res) {
             }
         }
     });
+    // 如果任务状态变更为已完成，且是重复任务，则创建下一个重复任务
+    if (status === 'DONE' && task.repeat && task.status !== 'DONE') {
+        try {
+            await createNextRecurringTask(id);
+        }
+        catch (error) {
+            // 记录错误但不影响响应
+            console.error('创建下一个重复任务失败:', error);
+        }
+    }
     res.json({
         success: true,
         data: updatedTask
@@ -284,6 +315,16 @@ export async function updateTaskStatus(req, res) {
             }
         }
     });
+    // 如果任务状态变更为已完成，且是重复任务，则创建下一个重复任务
+    if (status === 'DONE' && task.repeat) {
+        try {
+            await createNextRecurringTask(id);
+        }
+        catch (error) {
+            // 记录错误但不影响响应
+            console.error('创建下一个重复任务失败:', error);
+        }
+    }
     res.json({
         success: true,
         data: updatedTask
@@ -488,6 +529,365 @@ export async function deleteComment(req, res) {
     res.json({
         success: true,
         message: '评论已删除'
+    });
+}
+/**
+ * 归档已完成超过30天的任务
+ */
+export async function archiveCompletedTasks(req, res) {
+    const userId = req.userId;
+    // 计算30天前的日期
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // 查找用户有权限的、已完成超过30天且未归档的任务
+    const tasksToArchive = await prisma.task.findMany({
+        where: {
+            deletedAt: null,
+            isArchived: false,
+            status: 'DONE',
+            updatedAt: { lt: thirtyDaysAgo },
+            OR: [
+                { assigneeId: userId },
+                { collaborators: { some: { userId } } },
+                { project: { members: { some: { userId } } } }
+            ]
+        },
+        select: { id: true }
+    });
+    const taskIds = tasksToArchive.map(t => t.id);
+    if (taskIds.length === 0) {
+        res.json({
+            success: true,
+            message: '没有需要归档的任务',
+            data: { count: 0 }
+        });
+        return;
+    }
+    // 批量更新为已归档
+    const result = await prisma.task.updateMany({
+        where: { id: { in: taskIds } },
+        data: {
+            isArchived: true,
+            archivedAt: new Date()
+        }
+    });
+    res.json({
+        success: true,
+        message: `已归档 ${result.count} 个任务`,
+        data: { count: result.count }
+    });
+}
+/**
+ * 获取已归档任务列表
+ */
+export async function getArchivedTasks(req, res) {
+    const userId = req.userId;
+    const { projectId } = req.query;
+    // 构建查询条件
+    const where = {
+        deletedAt: null,
+        isArchived: true
+    };
+    if (projectId) {
+        where.projectId = projectId;
+    }
+    // 只返回用户有权限的归档任务
+    if (!projectId) {
+        where.OR = [
+            { assigneeId: userId },
+            { collaborators: { some: { userId } } },
+            { project: { members: { some: { userId } } } }
+        ];
+    }
+    const tasks = await prisma.task.findMany({
+        where,
+        include: {
+            project: {
+                select: { id: true, name: true }
+            },
+            category: true,
+            assignee: {
+                select: { id: true, nickname: true, avatar: true }
+            },
+            creator: {
+                select: { id: true, nickname: true }
+            }
+        },
+        orderBy: { archivedAt: 'desc' }
+    });
+    res.json({
+        success: true,
+        data: tasks
+    });
+}
+/**
+ * 恢复归档任务
+ */
+export async function unarchiveTask(req, res) {
+    const { id } = req.params;
+    const userId = req.userId;
+    // 检查任务是否存在
+    const task = await prisma.task.findFirst({
+        where: { id, deletedAt: null, isArchived: true }
+    });
+    if (!task) {
+        throw new ApiError(404, '归档任务不存在');
+    }
+    // 检查权限
+    const member = await prisma.projectMember.findUnique({
+        where: {
+            projectId_userId: { projectId: task.projectId, userId: userId }
+        }
+    });
+    if (!member) {
+        throw new ApiError(403, '无权恢复该任务');
+    }
+    const updatedTask = await prisma.task.update({
+        where: { id },
+        data: {
+            isArchived: false,
+            archivedAt: null
+        },
+        include: {
+            project: {
+                select: { id: true, name: true }
+            },
+            category: true,
+            assignee: {
+                select: { id: true, nickname: true, avatar: true }
+            }
+        }
+    });
+    res.json({
+        success: true,
+        message: '任务已恢复',
+        data: updatedTask
+    });
+}
+/**
+ * 批量更新任务
+ */
+export async function batchUpdateTasks(req, res) {
+    const userId = req.userId;
+    const { taskIds, status, priority } = req.body;
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+        throw new ApiError(400, '请选择要更新的任务');
+    }
+    // 构建更新数据
+    const updateData = {};
+    if (status)
+        updateData.status = status;
+    if (priority)
+        updateData.priority = priority;
+    if (Object.keys(updateData).length === 0) {
+        throw new ApiError(400, '请指定要更新的字段');
+    }
+    // 验证用户对任务的权限
+    const tasks = await prisma.task.findMany({
+        where: {
+            id: { in: taskIds },
+            deletedAt: null
+        },
+        select: { id: true, projectId: true }
+    });
+    // 检查权限
+    for (const task of tasks) {
+        const member = await prisma.projectMember.findUnique({
+            where: {
+                projectId_userId: { projectId: task.projectId, userId: userId }
+            }
+        });
+        if (!member) {
+            throw new ApiError(403, `无权修改任务 ${task.id}`);
+        }
+    }
+    // 批量更新
+    const result = await prisma.task.updateMany({
+        where: {
+            id: { in: taskIds },
+            deletedAt: null
+        },
+        data: updateData
+    });
+    res.json({
+        success: true,
+        message: `已更新 ${result.count} 个任务`,
+        data: { count: result.count }
+    });
+}
+/**
+ * 批量删除任务
+ */
+export async function batchDeleteTasks(req, res) {
+    const userId = req.userId;
+    const { taskIds } = req.body;
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+        throw new ApiError(400, '请选择要删除的任务');
+    }
+    // 验证用户对任务的权限
+    const tasks = await prisma.task.findMany({
+        where: {
+            id: { in: taskIds },
+            deletedAt: null
+        },
+        select: { id: true, projectId: true }
+    });
+    // 检查权限
+    for (const task of tasks) {
+        const member = await prisma.projectMember.findUnique({
+            where: {
+                projectId_userId: { projectId: task.projectId, userId: userId }
+            }
+        });
+        if (!member) {
+            throw new ApiError(403, `无权删除任务 ${task.id}`);
+        }
+    }
+    // 批量软删除
+    const result = await prisma.task.updateMany({
+        where: {
+            id: { in: taskIds },
+            deletedAt: null
+        },
+        data: { deletedAt: new Date() }
+    });
+    res.json({
+        success: true,
+        message: `已删除 ${result.count} 个任务`,
+        data: { count: result.count }
+    });
+}
+/**
+ * 批量归档任务
+ */
+export async function batchArchiveTasks(req, res) {
+    const userId = req.userId;
+    const { taskIds } = req.body;
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+        throw new ApiError(400, '请选择要归档的任务');
+    }
+    // 验证用户对任务的权限
+    const tasks = await prisma.task.findMany({
+        where: {
+            id: { in: taskIds },
+            deletedAt: null
+        },
+        select: { id: true, projectId: true }
+    });
+    // 检查权限
+    for (const task of tasks) {
+        const member = await prisma.projectMember.findUnique({
+            where: {
+                projectId_userId: { projectId: task.projectId, userId: userId }
+            }
+        });
+        if (!member) {
+            throw new ApiError(403, `无权归档任务 ${task.id}`);
+        }
+    }
+    // 批量归档
+    const result = await prisma.task.updateMany({
+        where: {
+            id: { in: taskIds },
+            deletedAt: null
+        },
+        data: {
+            isArchived: true,
+            archivedAt: new Date()
+        }
+    });
+    res.json({
+        success: true,
+        message: `已归档 ${result.count} 个任务`,
+        data: { count: result.count }
+    });
+}
+/**
+ * 获取所有标签
+ */
+export async function getAllTags(req, res) {
+    const userId = req.userId;
+    const { projectId } = req.query;
+    // 构建查询条件
+    const where = {
+        deletedAt: null,
+        isArchived: false
+    };
+    if (projectId) {
+        where.projectId = projectId;
+    }
+    else {
+        // 获取用户有权限的所有任务的标签
+        where.OR = [
+            { assigneeId: userId },
+            { collaborators: { some: { userId } } },
+            { project: { members: { some: { userId } } } }
+        ];
+    }
+    const tasks = await prisma.task.findMany({
+        where,
+        select: { tags: true }
+    });
+    // 提取并去重所有标签
+    const tagsSet = new Set();
+    tasks.forEach(task => {
+        if (task.tags && Array.isArray(task.tags)) {
+            task.tags.forEach(tag => tagsSet.add(tag));
+        }
+    });
+    const tags = Array.from(tagsSet).sort();
+    res.json({
+        success: true,
+        data: tags
+    });
+}
+/**
+ * 更新任务标签
+ */
+export async function updateTaskTags(req, res) {
+    const { id } = req.params;
+    const userId = req.userId;
+    const { tags } = req.body;
+    // 验证标签格式
+    if (!Array.isArray(tags)) {
+        throw new ApiError(400, '标签格式无效');
+    }
+    // 验证每个标签都是字符串
+    if (!tags.every(tag => typeof tag === 'string')) {
+        throw new ApiError(400, '标签必须为字符串');
+    }
+    // 检查任务是否存在
+    const task = await prisma.task.findFirst({
+        where: { id, deletedAt: null }
+    });
+    if (!task) {
+        throw new ApiError(404, '任务不存在');
+    }
+    // 检查权限
+    const member = await prisma.projectMember.findUnique({
+        where: {
+            projectId_userId: { projectId: task.projectId, userId: userId }
+        }
+    });
+    if (!member) {
+        throw new ApiError(403, '无权修改该任务');
+    }
+    const updatedTask = await prisma.task.update({
+        where: { id },
+        data: { tags: JSON.stringify(tags) },
+        include: {
+            project: {
+                select: { id: true, name: true }
+            },
+            category: true,
+            assignee: {
+                select: { id: true, nickname: true, avatar: true }
+            }
+        }
+    });
+    res.json({
+        success: true,
+        data: updatedTask
     });
 }
 //# sourceMappingURL=taskController.js.map

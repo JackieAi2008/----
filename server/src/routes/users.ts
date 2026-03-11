@@ -15,6 +15,13 @@ const router = Router()
 router.get('/', auth, requireAdmin, userController.getUsers)
 
 /**
+ * @route   GET /api/users/search
+ * @desc    搜索用户（用于跨部门邀请）
+ * @access  Private
+ */
+router.get('/search', auth, userController.searchUsers)
+
+/**
  * @route   GET /api/users/:id
  * @desc    获取用户详情
  * @access  Private
@@ -27,12 +34,5 @@ router.get('/:id', auth, userController.getUserById)
  * @access  Private
  */
 router.put('/:id', auth, userController.updateUser)
-
-/**
- * @route   GET /api/users/search
- * @desc    搜索用户
- * @access  Private
- */
-router.get('/search', auth, userController.searchUsers)
 
 export default router

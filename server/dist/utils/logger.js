@@ -30,6 +30,12 @@ function writeToFile(filename, content) {
  * 日志记录器
  */
 export const logger = {
+    debug(message, data) {
+        if (process.env.NODE_ENV === 'development') {
+            const content = formatMessage('debug', message, data);
+            console.log(content.trim());
+        }
+    },
     info(message, data) {
         const content = formatMessage('info', message, data);
         console.log(content.trim());

@@ -99,10 +99,47 @@
           </label>
           <select v-model="form.assigneeId" class="input" required>
             <option value="">请选择负责人</option>
-            <option v-for="member in members" :key="member.userId" :value="member.userId">
-              {{ member.user?.nickname || '未知用户' }}
-            </option>
+            <optgroup label="项目成员">
+              <option v-for="member in members" :key="member.userId" :value="member.userId">
+                {{ member.user?.nickname || '未知用户' }}
+              </option>
+            </optgroup>
           </select>
+          <!-- 跨部门搜索（仅项目负责人和管理员可见） -->
+          <div v-if="canSearchCrossDept" class="mt-2">
+            <details class="group">
+              <summary class="text-sm text-blue-600 cursor-pointer hover:text-blue-700">
+                搜索其他部门成员
+              </summary>
+              <div class="mt-2">
+                <input
+                  v-model="assigneeSearchKeyword"
+                  type="text"
+                  class="input text-sm"
+                  placeholder="输入姓名或邮箱搜索"
+                  @input="handleAssigneeSearch"
+                />
+                <div v-if="assigneeSearchResults.length > 0" class="mt-2 border rounded-lg max-h-32 overflow-y-auto">
+                  <div
+                    v-for="user in assigneeSearchResults"
+                    :key="user.id"
+                    class="p-2 flex items-center justify-between hover:bg-gray-50 cursor-pointer"
+                    @click="selectCrossDeptAssignee(user)"
+                  >
+                    <div class="flex items-center gap-2">
+                      <div class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
+                        <span class="text-xs text-gray-500">{{ user.nickname?.charAt(0) }}</span>
+                      </div>
+                      <div>
+                        <p class="text-xs font-medium">{{ user.nickname }}</p>
+                        <p class="text-xs text-gray-400">{{ user.department?.name }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
         </div>
 
         <!-- 类别和优先级 -->
@@ -280,9 +317,11 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { X, FileText, Plus } from 'lucide-vue-next'
 import { useProjectStore } from '@/stores/project'
+import { useAuthStore } from '@/stores/auth'
 import { getProjectMembers } from '@/api/project'
 import { getTaskCategories, createTask, updateTask, getTask, getAllTags } from '@/api/task'
 import { createTemplate } from '@/api/template'
+import { searchUsers } from '@/api/user'
 import { formatDateTime } from '@/utils/date'
 import { devLog } from '@/utils/logger'
 import { getTagColorClasses } from '@/utils/tagColor'
@@ -290,6 +329,7 @@ import TaskTemplateDialog from './TaskTemplateDialog.vue'
 import QuickCreateProjectDialog from '@/components/project/QuickCreateProjectDialog.vue'
 import type { TaskCategory, Reminder, Repeat, TaskTemplate } from '@/types/task'
 import type { ProjectMember } from '@/types/project'
+import type { User } from '@/types/user'
 
 const props = defineProps<{
   date?: Date | null
@@ -302,6 +342,7 @@ const emit = defineEmits<{
 }>()
 
 const projectStore = useProjectStore()
+const authStore = useAuthStore()
 
 // 状态
 const submitting = ref(false)
@@ -312,6 +353,9 @@ const availableTags = ref<string[]>([])
 const newTagInput = ref('')
 const showTemplateDialog = ref(false)
 const showQuickCreateProject = ref(false)
+const assigneeSearchKeyword = ref('')
+const assigneeSearchResults = ref<User[]>([])
+let searchTimeout: number | null = null
 
 // 表单数据
 const form = reactive({
@@ -332,6 +376,11 @@ const form = reactive({
 // 计算属性
 const projects = computed(() => projectStore.activeProjects)
 const isEdit = computed(() => !!props.taskId)
+const canSearchCrossDept = computed(() => {
+  // 只有项目负责人和管理员可以跨部门分配任务
+  const currentProject = projects.value.find(p => p.id === form.projectId)
+  return authStore.isAdmin || currentProject?.ownerId === authStore.user?.id
+})
 
 // 初始化截止日期
 watch(() => props.date, (newDate) => {
@@ -372,6 +421,32 @@ async function handleProjectChange() {
   } catch (error) {
     devLog.error('获取项目数据失败', error)
   }
+}
+
+// 跨部门负责人搜索
+async function handleAssigneeSearch() {
+  if (searchTimeout) clearTimeout(searchTimeout)
+
+  if (assigneeSearchKeyword.value.length < 2) {
+    assigneeSearchResults.value = []
+    return
+  }
+
+  searchTimeout = window.setTimeout(async () => {
+    try {
+      assigneeSearchResults.value = await searchUsers(assigneeSearchKeyword.value)
+    } catch (e) {
+      devLog.error('搜索用户失败:', e)
+      assigneeSearchResults.value = []
+    }
+  }, 300)
+}
+
+// 选择跨部门负责人
+function selectCrossDeptAssignee(user: User) {
+  form.assigneeId = user.id
+  assigneeSearchKeyword.value = ''
+  assigneeSearchResults.value = []
 }
 
 // 加载任务数据（编辑模式）

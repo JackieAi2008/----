@@ -1,5 +1,33 @@
 <template>
   <div class="space-y-6">
+    <!-- 全局统计卡片 -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <StatisticsCard
+        :icon="Building2"
+        :value="dashboard?.overview.departments || 0"
+        label="部门"
+        color="blue"
+      />
+      <StatisticsCard
+        :icon="Users"
+        :value="dashboard?.overview.users || 0"
+        label="用户"
+        color="green"
+      />
+      <StatisticsCard
+        :icon="FolderKanban"
+        :value="dashboard?.overview.projects || 0"
+        label="项目"
+        color="purple"
+      />
+      <StatisticsCard
+        :icon="CheckCircle"
+        :value="dashboard?.overview.tasks || 0"
+        label="任务"
+        color="yellow"
+      />
+    </div>
+
     <!-- 页面标题 -->
     <div class="flex justify-between items-center">
       <div>
@@ -20,54 +48,58 @@
       <div v-if="loading" class="p-8 text-center text-gray-500">
         加载中...
       </div>
-      <div v-else-if="departments.length === 0" class="p-8 text-center text-gray-500">
+      <div v-else-if="dashboardDepartments.length === 0 && departments.length === 0" class="p-8 text-center text-gray-500">
         暂无部门，点击上方按钮创建第一个部门
       </div>
       <div v-else class="divide-y divide-gray-200">
         <div
-          v-for="dept in departments"
+          v-for="dept in dashboardDepartments.length > 0 ? dashboardDepartments : departments"
           :key="dept.id"
-          class="p-4 hover:bg-gray-50 flex items-center justify-between"
+          class="p-4 hover:bg-gray-50"
         >
-          <div class="flex-1">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Building2 class="w-5 h-5 text-blue-600" />
+          <div class="flex items-center justify-between">
+            <div class="flex-1">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Building2 class="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 class="font-medium text-gray-900">{{ dept.name }}</h3>
+                  <p class="text-sm text-gray-500">{{ dept.description || '暂无描述' }}</p>
+                </div>
               </div>
-              <div>
-                <h3 class="font-medium text-gray-900">{{ dept.name }}</h3>
-                <p class="text-sm text-gray-500">{{ dept.description || '暂无描述' }}</p>
+            </div>
+            <div class="flex items-center gap-6 text-sm text-gray-500">
+              <div class="flex items-center gap-1">
+                <Users class="w-4 h-4" />
+                <span>{{ dept.memberCount || 0 }} 人</span>
               </div>
-            </div>
-          </div>
-          <div class="flex items-center gap-6 text-sm text-gray-500">
-            <div class="flex items-center gap-1">
-              <Users class="w-4 h-4" />
-              <span>{{ dept.memberCount || 0 }} 人</span>
-            </div>
-            <div class="flex items-center gap-1">
-              <FolderKanban class="w-4 h-4" />
-              <span>{{ dept.projectCount || 0 }} 个项目</span>
-            </div>
-            <div class="flex items-center gap-1">
-              <Crown class="w-4 h-4" />
-              <span>{{ dept.admin?.nickname || '未指定' }}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <button
-                @click="openEditModal(dept)"
-                class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
-                title="编辑"
-              >
-                <Pencil class="w-4 h-4" />
-              </button>
-              <button
-                @click="handleDelete(dept)"
-                class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
-                title="删除"
-              >
-                <Trash2 class="w-4 h-4" />
-              </button>
+              <div class="flex items-center gap-1">
+                <FolderKanban class="w-4 h-4" />
+                <span>{{ dept.projectCount || 0 }} 个项目</span>
+              </div>
+              <div class="w-32">
+                <ProgressBar
+                  v-if="dept.taskStats"
+                  :progress="Math.round((dept.taskStats.done / Math.max(dept.taskStats.todo + dept.taskStats.inProgress + dept.taskStats.done, 1)) * 100)"
+                />
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  @click="openEditModal(dept)"
+                  class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                  title="编辑"
+                >
+                  <Pencil class="w-4 h-4" />
+                </button>
+                <button
+                  @click="handleDelete(dept)"
+                  class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                  title="删除"
+                >
+                  <Trash2 class="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -143,11 +175,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { Plus, Building2, Users, FolderKanban, Crown, Pencil, Trash2 } from 'lucide-vue-next'
+import { Plus, Building2, Users, FolderKanban, Crown, Pencil, Trash2, CheckCircle } from 'lucide-vue-next'
 import { useDepartmentStore } from '@/stores/department'
 import type { Department } from '@/types/department'
 import type { User } from '@/types/user'
 import { get } from '@/utils/request'
+import StatisticsCard from '@/components/StatisticsCard.vue'
+import ProgressBar from '@/components/ProgressBar.vue'
+import { getAdminDashboard, type AdminDashboard } from '@/api/dashboard'
 
 const departmentStore = useDepartmentStore()
 
@@ -156,6 +191,7 @@ const submitting = ref(false)
 const showCreateModal = ref(false)
 const editingDepartment = ref<Department | null>(null)
 const availableUsers = ref<User[]>([])
+const dashboard = ref<AdminDashboard | null>(null)
 
 const form = ref({
   name: '',
@@ -164,6 +200,7 @@ const form = ref({
 })
 
 const departments = computed(() => departmentStore.departments)
+const dashboardDepartments = computed(() => dashboard.value?.departments || [])
 
 // 获取可用用户列表
 async function fetchAvailableUsers() {
@@ -203,6 +240,8 @@ async function handleSubmit() {
     }
     closeModal()
     await departmentStore.fetchDepartments()
+    // 重新获取仪表盘数据
+    dashboard.value = await getAdminDashboard().catch(() => null)
   } catch (e) {
     console.error('操作失败:', e)
   } finally {
@@ -218,6 +257,8 @@ async function handleDelete(dept: Department) {
   try {
     await departmentStore.deleteDepartment(dept.id)
     await departmentStore.fetchDepartments()
+    // 重新获取仪表盘数据
+    dashboard.value = await getAdminDashboard().catch(() => null)
   } catch (e) {
     console.error('删除失败:', e)
   }
@@ -230,6 +271,7 @@ onMounted(async () => {
       departmentStore.fetchDepartments(),
       fetchAvailableUsers()
     ])
+    dashboard.value = await getAdminDashboard().catch(() => null) ?? null
   } finally {
     loading.value = false
   }

@@ -21,6 +21,11 @@ export interface Project {
     nickname: string
     avatar: string | null
   }
+  departmentId?: string
+  department?: {
+    id: string
+    name: string
+  }
   members?: ProjectMember[]
   createdAt: string
   updatedAt: string

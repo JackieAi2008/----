@@ -15,7 +15,8 @@ export declare function getUserById(req: Request, res: Response): Promise<void>;
  */
 export declare function updateUser(req: Request, res: Response): Promise<void>;
 /**
- * 搜索用户
+ * 搜索用户（用于跨部门邀请）
+ * 只返回基本信息：id, nickname, department
  */
 export declare function searchUsers(req: Request, res: Response): Promise<void>;
 //# sourceMappingURL=userController.d.ts.map

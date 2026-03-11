@@ -239,7 +239,7 @@ export async function updateProject(req: Request, res: Response) {
 }
 
 /**
- * 删除项目（软删除）
+ * 删除项目（永久删除）
  * - 项目负责人、部门管理员、系统管理员可以删除
  */
 export async function deleteProject(req: Request, res: Response) {
@@ -268,9 +268,9 @@ export async function deleteProject(req: Request, res: Response) {
     throw new ApiError(403, '只有项目负责人或部门管理员可以删除项目')
   }
 
-  await prisma.project.update({
-    where: { id },
-    data: { deletedAt: new Date() }
+  // 永久删除项目（会级联删除相关数据）
+  await prisma.project.delete({
+    where: { id }
   })
 
   res.json({

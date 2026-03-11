@@ -4,6 +4,8 @@
 import { Request, Response } from 'express';
 /**
  * 获取当前用户的项目列表
+ * - 系统管理员：可以看到所有项目
+ * - 部门管理员/普通成员：本部门项目 + 被邀请的项目
  */
 export declare function getProjects(req: Request, res: Response): Promise<void>;
 /**
@@ -16,14 +18,17 @@ export declare function getPublicProjects(_req: Request, res: Response): Promise
 export declare function getProjectById(req: Request, res: Response): Promise<void>;
 /**
  * 创建项目
+ * - 自动设置 departmentId 为创建者的部门
  */
 export declare function createProject(req: Request, res: Response): Promise<void>;
 /**
  * 更新项目
+ * - 项目负责人、部门管理员、系统管理员可以修改
  */
 export declare function updateProject(req: Request, res: Response): Promise<void>;
 /**
- * 删除项目（软删除）
+ * 删除项目（永久删除）
+ * - 项目负责人、部门管理员、系统管理员可以删除
  */
 export declare function deleteProject(req: Request, res: Response): Promise<void>;
 /**
@@ -32,6 +37,7 @@ export declare function deleteProject(req: Request, res: Response): Promise<void
 export declare function getProjectMembers(req: Request, res: Response): Promise<void>;
 /**
  * 添加项目成员
+ * - 支持跨部门邀请
  */
 export declare function addMember(req: Request, res: Response): Promise<void>;
 /**
@@ -40,6 +46,7 @@ export declare function addMember(req: Request, res: Response): Promise<void>;
 export declare function removeMember(req: Request, res: Response): Promise<void>;
 /**
  * 邀请用户加入项目
+ * - 项目负责人和部门管理员可以跨部门邀请
  */
 export declare function inviteUser(req: Request, res: Response): Promise<void>;
 /**
@@ -62,4 +69,8 @@ export declare function restoreProject(req: Request, res: Response): Promise<voi
  * 永久删除项目
  */
 export declare function permanentDeleteProject(req: Request, res: Response): Promise<void>;
+/**
+ * 移交项目负责人
+ */
+export declare function transferProject(req: Request, res: Response): Promise<void>;
 //# sourceMappingURL=projectController.d.ts.map

@@ -185,6 +185,10 @@ export interface MemberDetail {
       status: string
       priority: string
       dueDate: string
+      project?: {
+        id: string
+        name: string
+      }
     }>
   }>
 }

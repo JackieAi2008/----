@@ -105,6 +105,12 @@ const routes: RouteRecordRaw[] = [
         name: 'MyDepartment',
         component: () => import('@/views/department/MyDepartment.vue'),
         meta: { title: '我的部门', requiresDepartmentAdmin: true }
+      },
+      {
+        path: 'my-department/members/:userId/calendar',
+        name: 'MemberCalendar',
+        component: () => import('@/views/department/MemberCalendar.vue'),
+        meta: { title: '成员日历', requiresDepartmentAdmin: true }
       }
     ]
   }

@@ -69,7 +69,7 @@ export async function getDashboard(req, res) {
             orderBy: { dueDate: 'asc' },
             take: 10
         }),
-        // 本周任务统计
+        // 本周任务统计（只统计公开任务）
         prisma.task.count({
             where: {
                 OR: [
@@ -77,10 +77,11 @@ export async function getDashboard(req, res) {
                     { collaborators: { some: { userId } } }
                 ],
                 dueDate: { gte: today, lt: weekLater },
-                deletedAt: null
+                deletedAt: null,
+                visibility: 'PUBLIC'
             }
         }),
-        // 本月统计
+        // 本月统计（只统计公开任务）
         prisma.task.groupBy({
             by: ['status'],
             where: {
@@ -89,7 +90,8 @@ export async function getDashboard(req, res) {
                     { collaborators: { some: { userId } } }
                 ],
                 dueDate: { gte: monthStart, lte: monthEnd },
-                deletedAt: null
+                deletedAt: null,
+                visibility: 'PUBLIC'
             },
             _count: true
         }),
@@ -144,7 +146,7 @@ export async function getWorkStats(req, res) {
     const end = endDate ? new Date(endDate) : new Date();
     end.setHours(23, 59, 59, 999);
     // 按状态统计
-    const statusStats = await prisma.task.groupBy({
+    const statusStatsRaw = await prisma.task.groupBy({
         by: ['status'],
         where: {
             OR: [
@@ -156,6 +158,11 @@ export async function getWorkStats(req, res) {
         },
         _count: true
     });
+    // 转换字段名：_count -> count
+    const statusStats = statusStatsRaw.map(s => ({
+        status: s.status,
+        count: s._count
+    }));
     // 按项目统计
     const projectStats = await prisma.task.groupBy({
         by: ['projectId'],

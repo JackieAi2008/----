@@ -177,7 +177,7 @@ export async function getWorkStats(req: Request, res: Response) {
   end.setHours(23, 59, 59, 999)
 
   // 按状态统计
-  const statusStats = await prisma.task.groupBy({
+  const statusStatsRaw = await prisma.task.groupBy({
     by: ['status'],
     where: {
       OR: [
@@ -189,6 +189,12 @@ export async function getWorkStats(req: Request, res: Response) {
     },
     _count: true
   })
+
+  // 转换字段名：_count -> count
+  const statusStats = statusStatsRaw.map(s => ({
+    status: s.status,
+    count: s._count
+  }))
 
   // 按项目统计
   const projectStats = await prisma.task.groupBy({

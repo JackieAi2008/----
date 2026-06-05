@@ -3,7 +3,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Project } from '@/types/project'
+import type { Project, ProjectCategory } from '@/types/project'
 import * as projectApi from '@/api/project'
 
 export const useProjectStore = defineStore('project', () => {
@@ -15,7 +15,11 @@ export const useProjectStore = defineStore('project', () => {
   // 计算属性
   const projectCount = computed(() => projects.value.length)
   const activeProjects = computed(() =>
-    projects.value.filter(p => !p.deletedAt)
+    projects.value.filter(p => !p.deletedAt && !p.isArchived)
+  )
+
+  const archivedProjects = computed(() =>
+    projects.value.filter(p => !p.deletedAt && p.isArchived)
   )
 
   // 获取项目列表
@@ -47,6 +51,7 @@ export const useProjectStore = defineStore('project', () => {
     name: string
     description?: string
     visibility: 'PUBLIC' | 'PRIVATE'
+    category?: ProjectCategory
   }) {
     const response = await projectApi.createProject(data)
     projects.value.push(response)
@@ -59,7 +64,8 @@ export const useProjectStore = defineStore('project', () => {
     const requestData = {
       ...data,
       description: data.description ?? undefined,
-      cover: data.cover ?? undefined
+      cover: data.cover ?? undefined,
+      category: data.category ?? undefined
     }
     const response = await projectApi.updateProject(id, requestData)
     const index = projects.value.findIndex(p => p.id === id)
@@ -87,6 +93,7 @@ export const useProjectStore = defineStore('project', () => {
     loading,
     projectCount,
     activeProjects,
+    archivedProjects,
     fetchProjects,
     fetchProject,
     createProject,

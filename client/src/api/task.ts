@@ -121,7 +121,7 @@ export async function unarchiveTask(id: string): Promise<Task> {
 export async function batchUpdateTasks(data: {
   taskIds: string[]
   status?: 'TODO' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED'
-  priority?: 'HIGH' | 'MEDIUM' | 'LOW'
+  priority?: 'IMPORTANT_URGENT' | 'IMPORTANT_NOT_URGENT' | 'URGENT_NOT_IMPORTANT' | 'NOT_IMPORTANT_NOT_URGENT'
 }): Promise<{ count: number }> {
   const response = await put<{ count: number }>('/tasks/batch', data)
   return response.data!

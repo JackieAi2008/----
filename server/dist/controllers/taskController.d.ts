@@ -17,11 +17,11 @@ export declare function createTask(req: Request, res: Response): Promise<void>;
 /**
  * 更新任务
  */
-export declare function updateTask(req: Request, res: Response): Promise<void>;
+export declare function updateTask(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
 /**
  * 更新任务状态（负责人、协作者也可以更新）
  */
-export declare function updateTaskStatus(req: Request, res: Response): Promise<void>;
+export declare function updateTaskStatus(req: Request, res: Response): Promise<Response<any, Record<string, any>> | undefined>;
 /**
  * 删除任务（软删除）
  */
@@ -82,4 +82,13 @@ export declare function getAllTags(req: Request, res: Response): Promise<void>;
  * 更新任务标签
  */
 export declare function updateTaskTags(req: Request, res: Response): Promise<void>;
+/**
+ * 添加进展记录（复用 Comment 模型，type='PROGRESS'）
+ */
+export declare function addProgressRecord(req: Request, res: Response): Promise<void>;
+/**
+ * 获取任务活动时间线
+ * 合并 AuditLog + Comments(含 PROGRESS) 按时间倒序排列
+ */
+export declare function getTaskActivity(req: Request, res: Response): Promise<void>;
 //# sourceMappingURL=taskController.d.ts.map

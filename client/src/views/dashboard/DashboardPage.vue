@@ -142,6 +142,12 @@
                 </p>
               </div>
               <span
+                v-if="project.category"
+                class="px-2 py-1 text-xs rounded-lg font-medium bg-indigo-100 text-indigo-700"
+              >
+                {{ PROJECT_CATEGORY_MAP[project.category] }}
+              </span>
+              <span
                 class="px-2.5 py-1 text-xs rounded-lg font-medium"
                 :class="project.visibility === 'PUBLIC' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
               >
@@ -166,6 +172,7 @@ import { useAuthStore } from '@/stores/auth'
 import { getDashboard, type DashboardData } from '@/api/dashboard'
 import { formatDate as formatDateUtil } from '@/utils/date'
 import { devLog } from '@/utils/logger'
+import { PROJECT_CATEGORY_MAP } from '@/types/project'
 import ExpandableStatCard, { type StatCardItem } from '@/components/dashboard/ExpandableStatCard.vue'
 
 const router = useRouter()

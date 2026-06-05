@@ -150,3 +150,19 @@ export async function transferProject(
   const response = await put<Project>(`/projects/${projectId}/transfer`, { newOwnerId })
   return response.data!
 }
+
+/**
+ * 归档项目
+ */
+export async function archiveProject(id: string): Promise<Project> {
+  const response = await put<Project>(`/projects/${id}/archive`)
+  return response.data!
+}
+
+/**
+ * 取消归档项目
+ */
+export async function unarchiveProject(id: string): Promise<Project> {
+  const response = await put<Project>(`/projects/${id}/unarchive`)
+  return response.data!
+}

@@ -145,7 +145,7 @@ export async function getWorkStats(req, res) {
     start.setHours(0, 0, 0, 0);
     const end = endDate ? new Date(endDate) : new Date();
     end.setHours(23, 59, 59, 999);
-    // 按状态统计
+    // 按状态统计（按创建时间筛选，包含在时间段内创建的所有任务）
     const statusStatsRaw = await prisma.task.groupBy({
         by: ['status'],
         where: {
@@ -153,7 +153,7 @@ export async function getWorkStats(req, res) {
                 { assigneeId: userId },
                 { collaborators: { some: { userId } } }
             ],
-            dueDate: { gte: start, lte: end },
+            createdAt: { gte: start, lte: end },
             deletedAt: null
         },
         _count: true
@@ -171,7 +171,7 @@ export async function getWorkStats(req, res) {
                 { assigneeId: userId },
                 { collaborators: { some: { userId } } }
             ],
-            dueDate: { gte: start, lte: end },
+            createdAt: { gte: start, lte: end },
             deletedAt: null
         },
         _count: true

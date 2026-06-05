@@ -146,7 +146,7 @@ export async function getProjectById(req: Request, res: Response) {
  */
 export async function createProject(req: Request, res: Response) {
   const userId = (req as AuthRequest).userId
-  const { name, description, visibility } = req.body
+  const { name, description, visibility, category } = req.body
 
   // 验证用户ID
   if (!userId) {
@@ -156,6 +156,12 @@ export async function createProject(req: Request, res: Response) {
   // 验证项目名称
   if (!name || !name.trim()) {
     throw new ApiError(400, '项目名称不能为空')
+  }
+
+  // 验证项目分类
+  const validCategories = ['PARTY_BUILDING', 'TRADE_UNION', 'COMMUNIST_YOUTH_LEAGUE', 'PUBLIC_WELFARE', 'COMPREHENSIVE']
+  if (category && !validCategories.includes(category)) {
+    throw new ApiError(400, '无效的项目分类')
   }
 
   // 获取创建者的部门
@@ -168,7 +174,8 @@ export async function createProject(req: Request, res: Response) {
     userId,
     name: name.trim(),
     departmentId: creator?.departmentId,
-    visibility
+    visibility,
+    category
   })
 
   // 生成项目ID
@@ -181,6 +188,7 @@ export async function createProject(req: Request, res: Response) {
       name: name.trim(),
       description: description?.trim() || null,
       visibility: visibility || 'PRIVATE',
+      category: category || null,
       ownerId: userId,
       departmentId: creator?.departmentId,
       updatedAt: new Date()
@@ -220,7 +228,7 @@ export async function createProject(req: Request, res: Response) {
 export async function updateProject(req: Request, res: Response) {
   const { id } = req.params
   const userId = (req as AuthRequest).userId
-  const { name, description, cover, visibility } = req.body
+  const { name, description, cover, visibility, category } = req.body
 
   // 获取项目
   const project = await prisma.project.findFirst({
@@ -249,7 +257,7 @@ export async function updateProject(req: Request, res: Response) {
 
   const updatedProject = await prisma.project.update({
     where: { id },
-    data: { name, description, cover, visibility },
+    data: { name, description, cover, visibility, category },
     include: {
       owner: {
         select: { id: true, nickname: true, avatar: true }
@@ -837,5 +845,75 @@ export async function transferProject(req: Request, res: Response) {
     success: true,
     data: result,
     message: '项目移交成功'
+  })
+}
+
+/**
+ * 归档项目
+ */
+export async function archiveProject(req: Request, res: Response) {
+  const { id } = req.params
+  const userId = (req as AuthRequest).userId
+
+  const project = await prisma.project.findFirst({
+    where: { id, deletedAt: null, ownerId: userId }
+  })
+
+  if (!project) {
+    throw new ApiError(404, '项目不存在或无权操作')
+  }
+
+  if (project.isArchived) {
+    throw new ApiError(400, '项目已归档')
+  }
+
+  const updated = await prisma.project.update({
+    where: { id },
+    data: { isArchived: true, archivedAt: new Date() },
+    include: {
+      owner: { select: { id: true, nickname: true, avatar: true } },
+      department: { select: { id: true, name: true } }
+    }
+  })
+
+  res.json({
+    success: true,
+    data: updated,
+    message: '项目已归档'
+  })
+}
+
+/**
+ * 取消归档项目
+ */
+export async function unarchiveProject(req: Request, res: Response) {
+  const { id } = req.params
+  const userId = (req as AuthRequest).userId
+
+  const project = await prisma.project.findFirst({
+    where: { id, deletedAt: null, ownerId: userId }
+  })
+
+  if (!project) {
+    throw new ApiError(404, '项目不存在或无权操作')
+  }
+
+  if (!project.isArchived) {
+    throw new ApiError(400, '项目未归档')
+  }
+
+  const updated = await prisma.project.update({
+    where: { id },
+    data: { isArchived: false, archivedAt: null },
+    include: {
+      owner: { select: { id: true, nickname: true, avatar: true } },
+      department: { select: { id: true, name: true } }
+    }
+  })
+
+  res.json({
+    success: true,
+    data: updated,
+    message: '项目已取消归档'
   })
 }

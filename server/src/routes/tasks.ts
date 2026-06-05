@@ -24,13 +24,15 @@ const updateTaskValidation = [
   body('title').optional().notEmpty().withMessage('任务标题不能为空'),
   body('dueDate').optional().isISO8601().withMessage('请输入有效的截止日期'),
   body('status').optional().isIn(['TODO', 'IN_PROGRESS', 'DONE', 'CANCELLED']).withMessage('无效的任务状态'),
-  body('priority').optional().isIn(['HIGH', 'MEDIUM', 'LOW']).withMessage('无效的优先级'),
+  body('priority').optional().isIn(['IMPORTANT_URGENT', 'IMPORTANT_NOT_URGENT', 'URGENT_NOT_IMPORTANT', 'NOT_IMPORTANT_NOT_URGENT']).withMessage('无效的优先级'),
   validate
 ]
 
 // 更新任务状态验证规则
 const updateStatusValidation = [
   body('status').isIn(['TODO', 'IN_PROGRESS', 'DONE', 'CANCELLED']).withMessage('无效的任务状态'),
+  body('deliverable').optional().isString(),
+  body('completionNote').optional().isString(),
   validate
 ]
 
@@ -38,7 +40,7 @@ const updateStatusValidation = [
 const batchUpdateValidation = [
   body('taskIds').isArray({ min: 1 }).withMessage('请选择要更新的任务'),
   body('status').optional().isIn(['TODO', 'IN_PROGRESS', 'DONE', 'CANCELLED']).withMessage('无效的任务状态'),
-  body('priority').optional().isIn(['HIGH', 'MEDIUM', 'LOW']).withMessage('无效的优先级'),
+  body('priority').optional().isIn(['IMPORTANT_URGENT', 'IMPORTANT_NOT_URGENT', 'URGENT_NOT_IMPORTANT', 'NOT_IMPORTANT_NOT_URGENT']).withMessage('无效的优先级'),
   validate
 ]
 
@@ -117,6 +119,20 @@ router.post('/categories', auth, taskController.createTaskCategory)
  * @access  Private
  */
 router.get('/:id', auth, taskController.getTaskById)
+
+/**
+ * @route   GET /api/tasks/:id/activity
+ * @desc    获取任务活动时间线
+ * @access  Private
+ */
+router.get('/:id/activity', auth, taskController.getTaskActivity)
+
+/**
+ * @route   POST /api/tasks/:id/progress
+ * @desc    添加进展记录
+ * @access  Private
+ */
+router.post('/:id/progress', auth, taskController.addProgressRecord)
 
 /**
  * @route   POST /api/tasks

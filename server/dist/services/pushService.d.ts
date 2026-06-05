@@ -1,9 +1,4 @@
 export declare const VAPID_PUBLIC_KEY: string;
-export declare const vapidConfig: {
-    publicKey: string;
-    privateKey: string;
-    subject: string;
-};
 interface PushSubscriptionData {
     endpoint: string;
     keys: {

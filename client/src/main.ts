@@ -18,3 +18,8 @@ app.use(router)
 
 // 挂载应用
 app.mount('#app')
+
+// 注册 Service Worker（推送通知依赖）
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {})
+}

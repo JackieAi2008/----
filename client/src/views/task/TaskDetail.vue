@@ -23,7 +23,7 @@
                 class="px-2 py-1 text-xs rounded-full"
                 :class="getPriorityClass(task.priority)"
               >
-                {{ getPriorityText(task.priority) }}优先级
+                {{ getPriorityText(task.priority) }}
               </span>
               <span
                 v-if="task.repeat"
@@ -132,9 +132,9 @@
         </div>
       </div>
 
-      <!-- 任务描述 -->
+      <!-- 核心工作及关键节点 -->
       <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        <h2 class="text-lg font-semibold text-gray-800 mb-4">任务描述</h2>
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">核心工作及关键节点</h2>
         <p v-if="task.description" class="text-gray-600 whitespace-pre-wrap">
           {{ task.description }}
         </p>
@@ -144,6 +144,22 @@
         <div v-if="task.deliverable" class="mt-4 pt-4 border-t border-gray-100">
           <h3 class="text-sm font-medium text-gray-700 mb-2">交付成果</h3>
           <p class="text-gray-600">{{ task.deliverable }}</p>
+        </div>
+
+        <!-- 完成信息 -->
+        <div v-if="task.status === 'DONE' && task.completedAt" class="mt-4 pt-4 border-t border-gray-100">
+          <div class="bg-green-50 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span class="text-sm font-medium text-green-700">任务已完成</span>
+            </div>
+            <div class="space-y-1 text-sm text-green-600">
+              <p>完成时间：{{ formatDateTime(task.completedAt) }}</p>
+              <p v-if="task.completionNote">完成备注：{{ task.completionNote }}</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -177,6 +193,55 @@
           </div>
         </div>
         <p v-else class="text-gray-400">暂无协作者</p>
+      </div>
+
+      <!-- 进展跟踪 -->
+      <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">进展跟踪</h2>
+        <!-- 填写进展 -->
+        <div class="mb-4">
+          <textarea
+            v-model="newProgress"
+            rows="2"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            placeholder="记录工作进展、遇到的问题、阶段性成果..."
+          ></textarea>
+          <div class="flex justify-end mt-2">
+            <button
+              @click="submitProgress"
+              :disabled="!newProgress.trim() || submittingProgress"
+              class="px-4 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm"
+            >
+              {{ submittingProgress ? '记录中...' : '记录进展' }}
+            </button>
+          </div>
+        </div>
+        <!-- 活动时间线 -->
+        <div v-if="activityLoading" class="text-center py-4 text-gray-400 text-sm">加载中...</div>
+        <div v-else-if="activities.length === 0" class="text-center py-4 text-gray-400 text-sm">暂无活动记录</div>
+        <div v-else class="space-y-0">
+          <div v-for="(item, idx) in activities" :key="item.id + '-' + item.type"
+            class="relative pl-6 pb-4"
+            :class="idx < activities.length - 1 ? 'border-l-2 border-gray-200 ml-3' : 'ml-3'"
+          >
+            <!-- 时间线圆点 -->
+            <div class="absolute left-[-5px] top-1 w-2.5 h-2.5 rounded-full"
+              :class="activityDotClass(item)">
+            </div>
+            <!-- 活动内容 -->
+            <div class="ml-3">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-gray-700">{{ item.user?.nickname || '系统' }}</span>
+                <span class="text-xs text-gray-400">{{ formatDateTime(item.createdAt) }}</span>
+              </div>
+              <p class="text-sm text-gray-600 mt-0.5">
+                <span v-if="item.type === 'audit'" class="text-gray-500">{{ item.description }}</span>
+                <span v-else-if="item.type === 'progress'" class="text-green-700 font-medium">📝 {{ item.content }}</span>
+                <span v-else class="text-gray-500">💬 {{ item.content }}</span>
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 评论区 -->
@@ -341,6 +406,16 @@
       @close="showEditForm = false"
       @saved="handleTaskUpdated"
     />
+
+    <!-- 完成确认弹窗 -->
+    <CompleteTaskDialog
+      v-if="showCompleteDialog"
+      :task-title="task?.title || ''"
+      :existing-deliverable="task?.deliverable"
+      :submitting="completing"
+      @confirm="handleComplete"
+      @cancel="showCompleteDialog = false"
+    />
   </div>
 </template>
 
@@ -357,6 +432,7 @@ import { devLog } from '@/utils/logger'
 import { getTagColorClasses } from '@/utils/tagColor'
 import type { Task, TaskStatus, Comment } from '@/types/task'
 import TaskForm from '@/components/task/TaskForm.vue'
+import CompleteTaskDialog from '@/components/task/CompleteTaskDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -372,6 +448,10 @@ const submittingComment = ref(false)
 const replyingTo = ref<Comment | null>(null)
 const replyContent = ref('')
 const unarchiving = ref(false)
+const newProgress = ref('')
+const submittingProgress = ref(false)
+const activities = ref<any[]>([])
+const activityLoading = ref(false)
 
 // 计算属性
 const taskId = computed(() => route.params.id as string)
@@ -439,21 +519,23 @@ function getStatusText(status: string): string {
 }
 
 function getPriorityClass(priority: string): string {
-  switch (priority) {
-    case 'HIGH': return 'bg-red-100 text-red-700'
-    case 'MEDIUM': return 'bg-yellow-100 text-yellow-700'
-    case 'LOW': return 'bg-gray-100 text-gray-600'
-    default: return 'bg-gray-100 text-gray-600'
+  const map: Record<string, string> = {
+    IMPORTANT_URGENT: 'bg-red-100 text-red-700',
+    IMPORTANT_NOT_URGENT: 'bg-blue-100 text-blue-700',
+    URGENT_NOT_IMPORTANT: 'bg-orange-100 text-orange-700',
+    NOT_IMPORTANT_NOT_URGENT: 'bg-gray-100 text-gray-600',
   }
+  return map[priority] || 'bg-gray-100 text-gray-600'
 }
 
 function getPriorityText(priority: string): string {
-  switch (priority) {
-    case 'HIGH': return '高'
-    case 'MEDIUM': return '中'
-    case 'LOW': return '低'
-    default: return '中'
+  const map: Record<string, string> = {
+    IMPORTANT_URGENT: '重要且紧急',
+    IMPORTANT_NOT_URGENT: '重要不紧急',
+    URGENT_NOT_IMPORTANT: '紧急不重要',
+    NOT_IMPORTANT_NOT_URGENT: '不重要不紧急',
   }
+  return map[priority] || '重要且紧急'
 }
 
 function getRepeatText(repeat: string): string {
@@ -486,6 +568,12 @@ async function fetchTask() {
 async function updateStatus(status: string) {
   if (!task.value || task.value.status === status) return
 
+  // 切换到 DONE 时弹出完成确认框
+  if (status === 'DONE') {
+    showCompleteDialog.value = true
+    return
+  }
+
   updatingStatus.value = true
   try {
     const taskStatus = status as TaskStatus
@@ -496,6 +584,30 @@ async function updateStatus(status: string) {
     alert('更新状态失败')
   } finally {
     updatingStatus.value = false
+  }
+}
+
+// 完成确认弹窗
+const showCompleteDialog = ref(false)
+const completing = ref(false)
+
+async function handleComplete(data: { deliverable: string; completionNote: string }) {
+  if (!task.value) return
+  completing.value = true
+  try {
+    await updateTask(taskId.value, {
+      status: 'DONE',
+      deliverable: data.deliverable,
+      completionNote: data.completionNote
+    })
+    // 刷新任务详情
+    await fetchTask()
+    showCompleteDialog.value = false
+  } catch (error: any) {
+    const msg = error?.response?.data?.message || '标记完成失败'
+    alert(msg)
+  } finally {
+    completing.value = false
   }
 }
 
@@ -637,8 +749,70 @@ async function handleUnarchive() {
   }
 }
 
+// 提交进展记录
+async function submitProgress() {
+  if (!newProgress.value.trim() || !task.value) return
+
+  submittingProgress.value = true
+  try {
+    const response = await fetch(`/api/tasks/${taskId.value}/progress`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({ content: newProgress.value })
+    })
+    const data = await response.json()
+    if (data.success) {
+      newProgress.value = ''
+      // 刷新活动时间线
+      await fetchActivity()
+    }
+  } catch (error) {
+    devLog.error('记录进展失败', error)
+    alert('记录进展失败')
+  } finally {
+    submittingProgress.value = false
+  }
+}
+
+// 获取活动时间线
+async function fetchActivity() {
+  if (!task.value) return
+  activityLoading.value = true
+  try {
+    const response = await fetch(`/api/tasks/${taskId.value}/activity?limit=30`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    const data = await response.json()
+    if (data.success) {
+      activities.value = data.data
+    }
+  } catch (error) {
+    devLog.error('获取活动记录失败', error)
+  } finally {
+    activityLoading.value = false
+  }
+}
+
+// 活动圆点样式
+function activityDotClass(item: any): string {
+  if (item.type === 'progress') return 'bg-green-500'
+  if (item.type === 'comment') return 'bg-gray-400'
+  if (item.action === 'TASK_CREATED') return 'bg-blue-500'
+  if (item.action === 'STATUS_CHANGE') return 'bg-green-500'
+  if (item.action === 'PRIORITY_CHANGE') return 'bg-orange-500'
+  if (item.action === 'ASSIGNEE_CHANGE') return 'bg-purple-500'
+  if (item.action === 'FIELD_UPDATE') return 'bg-amber-500'
+  return 'bg-gray-400'
+}
+
 // 初始化
 onMounted(() => {
   fetchTask()
+  fetchActivity()
 })
 </script>

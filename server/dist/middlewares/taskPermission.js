@@ -86,12 +86,12 @@ export async function getTaskPermissions(userId, taskId) {
             canComment: false
         };
     }
-    // 编辑和删除：项目负责人或任务创建者
-    const canEdit = isProjectOwner || isCreator;
-    const canDelete = isProjectOwner || isCreator;
-    // 修改负责人和截止时间：项目负责人或任务创建者
-    const canChangeAssignee = isProjectOwner || isCreator;
-    const canChangeDueDate = isProjectOwner || isCreator;
+    // 编辑和删除：项目负责人、任务创建者或任务负责人
+    const canEdit = isProjectOwner || isCreator || isAssignee;
+    const canDelete = isProjectOwner || isCreator || isAssignee;
+    // 修改负责人和截止时间：项目负责人、任务创建者或任务负责人
+    const canChangeAssignee = isProjectOwner || isCreator || isAssignee;
+    const canChangeDueDate = isProjectOwner || isCreator || isAssignee;
     // 更新状态：项目负责人、任务创建者、任务负责人或协作者
     const canChangeStatus = isProjectOwner || isCreator || isAssignee || isCollaborator;
     // 添加/移除协作者：项目负责人或任务创建者
@@ -136,6 +136,9 @@ export function requireTaskPermission(action) {
             case TaskAction.DELETE:
             case TaskAction.CHANGE_ASSIGNEE:
             case TaskAction.CHANGE_DUE_DATE:
+                // 项目负责人、任务创建者或任务负责人
+                hasPermission = isProjectOwner || isCreator || isAssignee;
+                break;
             case TaskAction.ADD_COLLABORATOR:
             case TaskAction.REMOVE_COLLABORATOR:
                 // 项目负责人或任务创建者

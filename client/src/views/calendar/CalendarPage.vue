@@ -1,5 +1,7 @@
 <template>
-  <div class="h-full flex flex-col animate-slide-up">
+  <div class="h-full flex gap-4 animate-slide-up">
+    <!-- 主内容区（日历视图） -->
+    <div class="flex-1 flex flex-col min-w-0">
     <!-- 顶部工具栏 -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 md:mb-6">
       <div class="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
@@ -349,9 +351,10 @@
           :disabled="batchOperationLoading"
         >
           <option value="">修改优先级</option>
-          <option value="HIGH">高</option>
-          <option value="MEDIUM">中</option>
-          <option value="LOW">低</option>
+          <option value="IMPORTANT_URGENT">重要且紧急</option>
+          <option value="IMPORTANT_NOT_URGENT">重要不紧急</option>
+          <option value="URGENT_NOT_IMPORTANT">紧急不重要</option>
+          <option value="NOT_IMPORTANT_NOT_URGENT">不重要不紧急</option>
         </select>
         <!-- 批量归档 -->
         <button
@@ -626,6 +629,97 @@
 
     <!-- 浮动新建按钮 -->
     <FabButton @click="showCreateTask = true" />
+    </div>
+
+    <!-- 右侧侧边栏 -->
+    <aside class="w-80 flex-shrink-0 hidden lg:flex flex-col gap-4">
+      <!-- 项目列表卡片 -->
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold text-gray-800 flex items-center gap-2">
+            <FolderKanban class="w-4 h-4 text-blue-600" />
+            项目列表
+          </h3>
+          <router-link to="/projects" class="text-xs text-blue-600 hover:text-blue-700">
+            查看全部
+          </router-link>
+        </div>
+        <div v-if="projects.length === 0" class="text-center py-4 text-gray-400 text-sm">
+          暂无项目
+        </div>
+        <div v-else class="space-y-2 max-h-48 overflow-y-auto">
+          <router-link
+            v-for="project in projects.slice(0, 5)"
+            :key="project.id"
+            :to="`/projects/${project.id}`"
+            class="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors group"
+          >
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0"></div>
+              <span class="text-sm text-gray-700 truncate group-hover:text-blue-600">{{ project.name }}</span>
+            </div>
+            <span class="text-xs text-gray-400 flex-shrink-0">查看</span>
+          </router-link>
+        </div>
+      </div>
+
+      <!-- 最近一周任务卡片 -->
+      <div class="bg-white rounded-2xl border border-gray-100 shadow-card p-4 flex-1 overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold text-gray-800 flex items-center gap-2">
+            <Clock class="w-4 h-4 text-green-600" />
+            最近一周任务
+          </h3>
+          <span class="text-xs text-gray-400">{{ upcomingTasks.length }} 项</span>
+        </div>
+        <div v-if="upcomingTasks.length === 0" class="text-center py-6 text-gray-400 text-sm flex-1 flex flex-col items-center justify-center">
+          <Calendar class="w-10 h-10 text-gray-200 mb-2" />
+          <p>暂无待办任务</p>
+        </div>
+        <div v-else class="space-y-2 overflow-y-auto flex-1">
+          <div
+            v-for="task in upcomingTasks"
+            :key="task.id"
+            class="p-2.5 rounded-lg border border-gray-100 hover:border-blue-200 hover:bg-blue-50/30 cursor-pointer transition-all"
+            @click="handleTaskClick(task)"
+          >
+            <div class="flex items-start gap-2">
+              <div
+                class="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
+                :style="{ backgroundColor: getTaskColor(task) }"
+              ></div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-800 truncate">{{ task.title }}</p>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="text-xs text-gray-400">{{ formatTaskDate(task.dueDate) }}</span>
+                  <span
+                    v-if="task.status === 'DONE'"
+                    class="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-600"
+                  >已完成</span>
+                  <span
+                    v-else-if="task.status === 'IN_PROGRESS'"
+                    class="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-600"
+                  >进行中</span>
+                  <span
+                    v-else-if="isOverdue(task)"
+                    class="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600"
+                  >逾期</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 任务详情弹窗 -->
+    <TaskDetail
+      v-if="showTaskDetail && selectedTask"
+      :task-id="selectedTask.id"
+      @close="showTaskDetail = false"
+      @updated="handleTaskSaved"
+      @deleted="handleTaskSaved"
+    />
   </div>
 </template>
 
@@ -636,8 +730,9 @@
  */
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronLeft, ChevronRight, Repeat, Trash2, Archive, X, Calendar } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, Repeat, Trash2, Archive, X, Calendar, FolderKanban, Clock } from 'lucide-vue-next'
 import { useProjectStore } from '@/stores/project'
+import TaskDetail from '@/views/task/TaskDetail.vue'
 import { getTasks, updateTask, batchUpdateTasks, batchDeleteTasks, batchArchiveTasks } from '@/api/task'
 import { getCalendarDays, isToday as checkIsToday, isSameDay, getWeekDayName, formatDateTime } from '@/utils/date'
 import { getLunarInfo as getLunarInfoRaw, formatLunarDisplay, type LunarInfo } from '@/utils/lunar'
@@ -669,6 +764,46 @@ const selectedProjectId = ref('')
 const selectedStatus = ref<string>('')
 const tasks = ref<Task[]>([])
 const showCreateTask = ref(false)
+const showTaskDetail = ref(false)
+const selectedTask = ref<Task | null>(null)
+
+// 计算最近一周的任务
+const upcomingTasks = computed(() => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const oneWeekLater = new Date(today)
+  oneWeekLater.setDate(oneWeekLater.getDate() + 7)
+
+  return tasks.value
+    .filter(task => {
+      const dueDate = new Date(task.dueDate)
+      dueDate.setHours(0, 0, 0, 0)
+      return dueDate >= today && dueDate <= oneWeekLater && task.status !== 'DONE' && task.status !== 'CANCELLED'
+    })
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+    .slice(0, 10)
+})
+
+// 格式化任务日期
+function formatTaskDate(dateStr: string): string {
+  const date = new Date(dateStr)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  const taskDate = new Date(date)
+  taskDate.setHours(0, 0, 0, 0)
+
+  if (taskDate.getTime() === today.getTime()) {
+    return '今天'
+  } else if (taskDate.getTime() === tomorrow.getTime()) {
+    return '明天'
+  } else {
+    const diff = Math.ceil((taskDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    return `${diff}天后`
+  }
+}
 
 // 常量
 const weekDays = ['日', '一', '二', '三', '四', '五', '六']
@@ -700,11 +835,12 @@ const statusOptions = [
   { value: 'CANCELLED', label: '已取消' }
 ]
 
-// 优先级选项
+// 优先级选项（四象限）
 const priorityOptions: Record<string, { label: string; color: string }> = {
-  HIGH: { label: '高', color: 'text-red-600 bg-red-100' },
-  MEDIUM: { label: '中', color: 'text-yellow-600 bg-yellow-100' },
-  LOW: { label: '低', color: 'text-green-600 bg-green-100' }
+  IMPORTANT_URGENT: { label: '重要且紧急', color: 'text-red-600 bg-red-100' },
+  IMPORTANT_NOT_URGENT: { label: '重要不紧急', color: 'text-blue-600 bg-blue-100' },
+  URGENT_NOT_IMPORTANT: { label: '紧急不重要', color: 'text-orange-600 bg-orange-100' },
+  NOT_IMPORTANT_NOT_URGENT: { label: '不重要不紧急', color: 'text-gray-600 bg-gray-100' }
 }
 
 // 拖拽相关状态
@@ -880,7 +1016,7 @@ async function handleBatchStatusChange(status: 'TODO' | 'IN_PROGRESS' | 'DONE' |
   }
 }
 
-async function handleBatchPriorityChange(priority: 'HIGH' | 'MEDIUM' | 'LOW') {
+async function handleBatchPriorityChange(priority: 'IMPORTANT_URGENT' | 'IMPORTANT_NOT_URGENT' | 'URGENT_NOT_IMPORTANT' | 'NOT_IMPORTANT_NOT_URGENT') {
   if (selectedTaskIds.value.size === 0) return
 
   batchOperationLoading.value = true

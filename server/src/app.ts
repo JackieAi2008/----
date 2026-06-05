@@ -27,6 +27,7 @@ import templateRoutes from './routes/templates.js'
 import departmentRoutes from './routes/departments.js'
 import adminRoutes from './routes/admin.js'
 import calendarRoutes from './routes/calendar.js'
+import evaluationRoutes from './routes/evaluations.js'
 
 // 导入中间件
 import { errorHandler } from './middlewares/errorHandler.js'
@@ -36,6 +37,9 @@ import { startScheduler } from './services/schedulerService.js'
 
 // 创建Express应用
 const app = express()
+
+// 信任反向代理（Nginx）
+app.set('trust proxy', 1)
 
 // 基础中间件
 app.use(cors())
@@ -67,6 +71,7 @@ app.use('/api/templates', templateRoutes)
 app.use('/api/departments', departmentRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/calendar', calendarRoutes)
+app.use('/api/evaluations', evaluationRoutes)
 
 // 健康检查
 app.get('/api/health', (_req, res) => {

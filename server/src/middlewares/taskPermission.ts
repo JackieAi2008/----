@@ -2,10 +2,10 @@
  * 中集智历 - 任务权限中间件
  *
  * 权限规则：
- * - 编辑任务：项目负责人或任务创建者
- * - 删除任务：项目负责人或任务创建者
- * - 修改负责人：项目负责人或任务创建者
- * - 修改截止时间：项目负责人或任务创建者
+ * - 编辑任务：项目负责人、任务创建者或任务负责人
+ * - 删除任务：项目负责人、任务创建者或任务负责人
+ * - 修改负责人：项目负责人、任务创建者或任务负责人
+ * - 修改截止时间：项目负责人、任务创建者或任务负责人
  * - 更新状态：项目负责人、任务创建者、任务负责人或协作者
  */
 import { Request, Response, NextFunction } from 'express'
@@ -149,13 +149,13 @@ export async function getTaskPermissions(
     }
   }
 
-  // 编辑和删除：项目负责人或任务创建者
-  const canEdit = isProjectOwner || isCreator
-  const canDelete = isProjectOwner || isCreator
+  // 编辑和删除：项目负责人、任务创建者或任务负责人
+  const canEdit = isProjectOwner || isCreator || isAssignee
+  const canDelete = isProjectOwner || isCreator || isAssignee
 
-  // 修改负责人和截止时间：项目负责人或任务创建者
-  const canChangeAssignee = isProjectOwner || isCreator
-  const canChangeDueDate = isProjectOwner || isCreator
+  // 修改负责人和截止时间：项目负责人、任务创建者或任务负责人
+  const canChangeAssignee = isProjectOwner || isCreator || isAssignee
+  const canChangeDueDate = isProjectOwner || isCreator || isAssignee
 
   // 更新状态：项目负责人、任务创建者、任务负责人或协作者
   const canChangeStatus = isProjectOwner || isCreator || isAssignee || isCollaborator
@@ -213,6 +213,10 @@ export function requireTaskPermission(action: TaskAction) {
       case TaskAction.DELETE:
       case TaskAction.CHANGE_ASSIGNEE:
       case TaskAction.CHANGE_DUE_DATE:
+        // 项目负责人、任务创建者或任务负责人
+        hasPermission = isProjectOwner || isCreator || isAssignee
+        break
+
       case TaskAction.ADD_COLLABORATOR:
       case TaskAction.REMOVE_COLLABORATOR:
         // 项目负责人或任务创建者

@@ -7,6 +7,22 @@ import { ApiError } from '../middlewares/errorHandler.js'
 import { getTaskPermissions } from '../middlewares/taskPermission.js'
 import { createNextRecurringTask } from '../services/recurringTaskService.js'
 import { AuthRequest } from '../middlewares/auth.js'
+import { writeAuditLog, logTaskChanges } from '../utils/auditLogger.js'
+
+// 解析 tags JSON 字符串为数组
+function parseTaskTags<T extends { tags?: string | null }>(task: T): T & { tags: string[] } {
+  let parsedTags: string[] = []
+  if (task.tags) {
+    try {
+      const result = JSON.parse(task.tags)
+      parsedTags = Array.isArray(result) ? result : []
+    } catch {
+      parsedTags = []
+    }
+  }
+  const { tags: _tags, ...rest } = task
+  return { ...rest, tags: parsedTags } as T & { tags: string[] }
+}
 
 // 用户选择字段（包含部门信息）
 const userSelectWithDept = {
@@ -98,7 +114,7 @@ export async function getTasks(req: Request, res: Response) {
 
   res.json({
     success: true,
-    data: tasks
+    data: tasks.map(parseTaskTags)
   })
 }
 
@@ -158,7 +174,7 @@ export async function getTaskById(req: Request, res: Response) {
   res.json({
     success: true,
     data: {
-      ...task,
+      ...parseTaskTags(task),
       permissions
     }
   })
@@ -178,7 +194,7 @@ export async function createTask(req: Request, res: Response) {
     categoryId,
     assigneeId,
     priority,
-    visibility,  // 新增：任务可见性
+    // visibility fixed to PUBLIC, ignored from request
     deliverable,
     tags,
     reminder,
@@ -207,11 +223,11 @@ export async function createTask(req: Request, res: Response) {
       dueDate: new Date(dueDate),
       categoryId,
       assigneeId,
-      priority: priority || 'MEDIUM',
+      priority: priority || 'IMPORTANT_URGENT',
       status: 'TODO',
-      visibility: visibility || 'PRIVATE',  // 默认私密
+      visibility: 'PUBLIC',  // 固定公开
       deliverable,
-      tags: tags || [],
+      tags: Array.isArray(tags) && tags.length > 0 ? JSON.stringify(tags) : null,
       reminder,
       repeat,
       creatorId: userId!,
@@ -246,6 +262,15 @@ export async function createTask(req: Request, res: Response) {
     })
   }
 
+  // 记录审计日志：任务创建
+  await writeAuditLog({
+    userId: userId!,
+    action: 'TASK_CREATED',
+    targetType: 'TASK',
+    targetId: task.id,
+    details: { title, projectId, assigneeId }
+  })
+
   // 发送通知给协作者
   if (collaboratorIds && collaboratorIds.length > 0) {
     const notifications = (collaboratorIds as string[])
@@ -266,7 +291,7 @@ export async function createTask(req: Request, res: Response) {
 
   res.status(201).json({
     success: true,
-    data: task
+    data: parseTaskTags(task)
   })
 }
 
@@ -312,6 +337,26 @@ export async function updateTask(req: Request, res: Response) {
     throw new ApiError(403, '无权修改该任务')
   }
 
+  // 标记完成时的校验
+  const completionData: Record<string, unknown> = {}
+  if (status === 'DONE' && task.status !== 'DONE') {
+    const finalDeliverable = deliverable || task.deliverable
+    if (!finalDeliverable) {
+      return res.status(400).json({
+        success: false,
+        message: '请填写交付成果后标记完成'
+      })
+    }
+    completionData.completedAt = new Date()
+    completionData.completedBy = userId
+    if (deliverable) completionData.deliverable = deliverable
+  }
+  // 从完成改回其他状态
+  if (task.status === 'DONE' && status && status !== 'DONE') {
+    completionData.completedAt = null
+    completionData.completedBy = null
+  }
+
   const updatedTask = await prisma.task.update({
     where: { id },
     data: {
@@ -325,9 +370,10 @@ export async function updateTask(req: Request, res: Response) {
       status,
       visibility,  // 更新可见性
       deliverable,
-      tags: tags || [],
+      tags: Array.isArray(tags) && tags.length > 0 ? JSON.stringify(tags) : null,
       reminder,
-      repeat
+      repeat,
+      ...completionData
     },
     include: {
       project: {
@@ -339,6 +385,15 @@ export async function updateTask(req: Request, res: Response) {
       }
     }
   })
+
+  // 记录审计日志：字段变更
+  const updates: Record<string, unknown> = {
+    title, description, priority, status, assigneeId,
+    visibility, deliverable, categoryId,
+    startDate: startDate ? new Date(startDate) : null,
+    dueDate: dueDate ? new Date(dueDate) : undefined
+  }
+  await logTaskChanges({ userId: userId!, taskId: id, oldTask: task, updates })
 
   // 如果任务状态变更为已完成，且是重复任务，则创建下一个重复任务
   if (status === 'DONE' && task.repeat && task.status !== 'DONE') {
@@ -352,7 +407,7 @@ export async function updateTask(req: Request, res: Response) {
 
   res.json({
     success: true,
-    data: updatedTask
+    data: parseTaskTags(updatedTask)
   })
 }
 
@@ -361,7 +416,7 @@ export async function updateTask(req: Request, res: Response) {
  */
 export async function updateTaskStatus(req: Request, res: Response) {
   const { id } = req.params
-  const { status } = req.body
+  const { status, deliverable, completionNote } = req.body
 
   // 检查任务是否存在
   const task = await prisma.task.findFirst({
@@ -372,10 +427,33 @@ export async function updateTaskStatus(req: Request, res: Response) {
     throw new ApiError(404, '任务不存在')
   }
 
+  const userId = (req as AuthRequest).userId!
+  const data: Record<string, unknown> = { status }
+
+  // 标记完成：校验交付物 + 记录完成信息
+  if (status === 'DONE' && task.status !== 'DONE') {
+    if (!task.deliverable && !deliverable) {
+      return res.status(400).json({
+        success: false,
+        message: '请填写交付成果后标记完成'
+      })
+    }
+    data.completedAt = new Date()
+    data.completedBy = userId
+    data.completionNote = completionNote || null
+    if (deliverable) data.deliverable = deliverable
+  }
+
+  // 从完成改回其他状态：清空完成信息
+  if (task.status === 'DONE' && status !== 'DONE') {
+    data.completedAt = null
+    data.completedBy = null
+  }
+
   // 权限检查已在中间件中完成
   const updatedTask = await prisma.task.update({
     where: { id },
-    data: { status },
+    data,
     include: {
       project: {
         select: { id: true, name: true }
@@ -385,6 +463,9 @@ export async function updateTaskStatus(req: Request, res: Response) {
       }
     }
   })
+
+  // 记录审计日志：状态变更
+  await logTaskChanges({ userId, taskId: id, oldTask: task, updates: { status } })
 
   // 如果任务状态变更为已完成，且是重复任务，则创建下一个重复任务
   if (status === 'DONE' && task.repeat) {
@@ -398,7 +479,7 @@ export async function updateTaskStatus(req: Request, res: Response) {
 
   res.json({
     success: true,
-    data: updatedTask
+    data: parseTaskTags(updatedTask)
   })
 }
 
@@ -741,7 +822,7 @@ export async function getArchivedTasks(req: Request, res: Response) {
 
   res.json({
     success: true,
-    data: tasks
+    data: tasks.map(parseTaskTags)
   })
 }
 
@@ -792,7 +873,7 @@ export async function unarchiveTask(req: Request, res: Response) {
   res.json({
     success: true,
     message: '任务已恢复',
-    data: updatedTask
+    data: parseTaskTags(updatedTask)
   })
 }
 
@@ -811,6 +892,12 @@ export async function batchUpdateTasks(req: Request, res: Response) {
   const updateData: Record<string, unknown> = {}
   if (status) updateData.status = status
   if (priority) updateData.priority = priority
+
+  // 批量标记完成时自动记录完成时间
+  if (status === 'DONE') {
+    updateData.completedAt = new Date()
+    updateData.completedBy = userId
+  }
 
   if (Object.keys(updateData).length === 0) {
     throw new ApiError(400, '请指定要更新的字段')
@@ -984,8 +1071,15 @@ export async function getAllTags(req: Request, res: Response) {
   // 提取并去重所有标签
   const tagsSet = new Set<string>()
   tasks.forEach(task => {
-    if (task.tags && Array.isArray(task.tags)) {
-      task.tags.forEach(tag => tagsSet.add(tag))
+    if (task.tags) {
+      try {
+        const parsed = JSON.parse(task.tags)
+        if (Array.isArray(parsed)) {
+          parsed.forEach(tag => tagsSet.add(tag))
+        }
+      } catch {
+        // tags is a plain string, skip
+      }
     }
   })
 
@@ -1051,6 +1145,162 @@ export async function updateTaskTags(req: Request, res: Response) {
 
   res.json({
     success: true,
-    data: updatedTask
+    data: parseTaskTags(updatedTask)
+  })
+}
+
+/**
+ * 添加进展记录（复用 Comment 模型，type='PROGRESS'）
+ */
+export async function addProgressRecord(req: Request, res: Response) {
+  const { id } = req.params
+  const userId = (req as AuthRequest).userId!
+  const { content } = req.body
+
+  if (!content || !content.trim()) {
+    throw new ApiError(400, '请输入进展内容')
+  }
+
+  const task = await prisma.task.findFirst({
+    where: { id, deletedAt: null }
+  })
+
+  if (!task) {
+    throw new ApiError(404, '任务不存在')
+  }
+
+  const comment = await prisma.comment.create({
+    data: {
+      taskId: id,
+      userId,
+      content: content.trim(),
+      type: 'PROGRESS'
+    },
+    include: {
+      user: {
+        select: { id: true, nickname: true, avatar: true, department: { select: { id: true, name: true } } }
+      }
+    }
+  })
+
+  // 审计日志
+  await writeAuditLog({
+    userId,
+    action: 'PROGRESS_ADDED',
+    targetType: 'TASK',
+    targetId: id,
+    details: { content: content.trim().substring(0, 100) }
+  })
+
+  res.status(201).json({
+    success: true,
+    data: comment
+  })
+}
+
+/**
+ * 获取任务活动时间线
+ * 合并 AuditLog + Comments(含 PROGRESS) 按时间倒序排列
+ */
+export async function getTaskActivity(req: Request, res: Response) {
+  const { id } = req.params
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 100)
+
+  const task = await prisma.task.findFirst({
+    where: { id, deletedAt: null }
+  })
+
+  if (!task) {
+    throw new ApiError(404, '任务不存在')
+  }
+
+  // 并行获取审计日志和评论
+  const [auditLogs, comments] = await Promise.all([
+    prisma.auditLog.findMany({
+      where: { targetType: 'TASK', targetId: id },
+      include: {
+        user: { select: { id: true, nickname: true, avatar: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit
+    }),
+    prisma.comment.findMany({
+      where: { taskId: id, deletedAt: null },
+      include: {
+        user: { select: { id: true, nickname: true, avatar: true, department: { select: { id: true, name: true } } } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit
+    })
+  ])
+
+  // 转换审计日志为统一格式
+  const auditItems = auditLogs.map(log => {
+    let details: Record<string, unknown> = {}
+    try {
+      details = JSON.parse(log.details || '{}')
+    } catch { /* ignore */ }
+
+    // 生成可读描述
+    let description = ''
+    const fieldLabel = details.fieldLabel as string || ''
+    const oldValue = details.oldValue as string || ''
+    const newValue = details.newValue as string || ''
+
+    switch (log.action) {
+      case 'TASK_CREATED':
+        description = '创建了任务'
+        break
+      case 'STATUS_CHANGE':
+        description = `将${fieldLabel}从「${oldValue}」改为「${newValue}」`
+        break
+      case 'PRIORITY_CHANGE':
+        description = `将${fieldLabel}从「${oldValue}」改为「${newValue}」`
+        break
+      case 'ASSIGNEE_CHANGE':
+        description = `更改了${fieldLabel}`
+        break
+      case 'FIELD_UPDATE':
+        description = `修改了${fieldLabel}${oldValue && newValue ? `：${oldValue} → ${newValue}` : ''}`
+        break
+      case 'PROGRESS_ADDED':
+        description = '记录了工作进展'
+        break
+      case 'BATCH_UPDATE':
+        description = '批量更新了任务'
+        break
+      default:
+        description = log.action
+    }
+
+    return {
+      id: log.id,
+      type: 'audit',
+      action: log.action,
+      description,
+      details,
+      user: log.user,
+      createdAt: log.createdAt.toISOString()
+    }
+  })
+
+  // 转换评论为统一格式
+  const commentItems = comments.map(comment => ({
+    id: comment.id,
+    type: (comment as any).type === 'PROGRESS' ? 'progress' : 'comment',
+    description: (comment as any).type === 'PROGRESS' ? '记录了工作进展' : '发表了评论',
+    content: comment.content,
+    user: comment.user,
+    createdAt: comment.createdAt.toISOString()
+  }))
+
+  // 合并并按时间倒序排列
+  const allItems = [...auditItems, ...commentItems]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit)
+
+  res.json({
+    success: true,
+    data: allItems
   })
 }

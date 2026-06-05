@@ -141,4 +141,18 @@ router.post('/:id/invite/reject', auth, projectController.rejectInvite)
  */
 router.put('/:id/transfer', auth, transferProjectValidation, projectController.transferProject)
 
+/**
+ * @route   PUT /api/projects/:id/archive
+ * @desc    归档项目
+ * @access  Private
+ */
+router.put('/:id/archive', auth, projectController.archiveProject)
+
+/**
+ * @route   PUT /api/projects/:id/unarchive
+ * @desc    取消归档项目
+ * @access  Private
+ */
+router.put('/:id/unarchive', auth, projectController.unarchiveProject)
+
 export default router

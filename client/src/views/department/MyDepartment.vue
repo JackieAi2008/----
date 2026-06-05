@@ -140,14 +140,31 @@
                 >
                   <Calendar class="w-4 h-4" />
                 </router-link>
-                <button
-                  v-if="member.id !== department.adminId"
-                  @click="handleRemoveMember(member.id)"
-                  class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                  title="移除成员"
-                >
-                  <UserMinus class="w-4 h-4" />
-                </button>
+                <!-- 部门管理员操作按钮 -->
+                <template v-if="member.id !== department?.adminId">
+                  <button
+                    @click="handleToggleMemberStatus(member)"
+                    class="px-3 py-1.5 text-sm rounded-lg transition-colors"
+                    :class="member.isBanned ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'"
+                    :title="member.isBanned ? '启用成员' : '禁用成员'"
+                  >
+                    {{ member.isBanned ? '启用' : '禁用' }}
+                  </button>
+                  <button
+                    @click="handleTransferDepartmentAdmin(member)"
+                    class="px-3 py-1.5 text-sm bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                    title="转让部门管理员"
+                  >
+                    转让管理员
+                  </button>
+                  <button
+                    @click="handleRemoveMember(member.id)"
+                    class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                    title="移除成员"
+                  >
+                    <UserMinus class="w-4 h-4" />
+                  </button>
+                </template>
               </div>
             </div>
           </div>
@@ -289,6 +306,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   Building2,
   Users,
@@ -305,14 +323,22 @@ import {
   AlertCircle
 } from 'lucide-vue-next'
 import { useDepartmentStore } from '@/stores/department'
+import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
 import type { User } from '@/types/user'
 import StatisticsCard from '@/components/StatisticsCard.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import { searchUsersForDepartment } from '@/api/department'
 import { getDepartmentDashboard, type DepartmentDashboard } from '@/api/dashboard'
+import {
+  transferDepartmentAdmin,
+  removeDepartmentMember,
+  toggleDepartmentMemberStatus
+} from '@/api/user'
 
+const router = useRouter()
 const departmentStore = useDepartmentStore()
+const authStore = useAuthStore()
 const toast = useToast()
 
 const loading = ref(true)
@@ -332,6 +358,12 @@ const dashboardMembers = computed(() => {
     const workloadData = dashboardMembersList.find(m => m.id === member.id)
     return {
       ...member,
+      avatar: member.avatar ?? null,
+      isBanned: (member as any).isBanned || false,
+      bio: (member as any).bio ?? null,
+      isAdmin: (member as any).isAdmin || false,
+      createdAt: (member as any).createdAt || new Date().toISOString(),
+      updatedAt: (member as any).updatedAt || new Date().toISOString(),
       workload: workloadData?.workload || { total: 0, todo: 0, inProgress: 0, done: 0 }
     }
   })
@@ -395,13 +427,58 @@ async function handleRemoveMember(userId: string) {
   if (!department.value) return
   if (!confirm('确定要移除该成员吗？')) return
   try {
-    await departmentStore.removeMember(department.value.id, userId)
+    await removeDepartmentMember(userId)
     toast.success('移除成功', '成员已从部门移除')
+    // 刷新部门数据
+    await departmentStore.fetchMyDepartment()
+    department.value = departmentStore.myDepartment
     // 刷新仪表盘数据
-    const result = await getDepartmentDashboard(department.value.id).catch(() => null)
-    dashboard.value = result ?? null
+    if (department.value?.id) {
+      const result = await getDepartmentDashboard(department.value.id).catch(() => null)
+      dashboard.value = result ?? null
+    }
   } catch (e) {
     toast.error('移除失败', e instanceof Error ? e.message : '未知错误')
+  }
+}
+
+// 禁用/启用部门成员
+async function handleToggleMemberStatus(member: User) {
+  const action = member.isBanned ? '启用' : '禁用'
+  if (!confirm(`确定要${action}成员「${member.nickname || member.email}」吗？`)) {
+    return
+  }
+
+  try {
+    const result = await toggleDepartmentMemberStatus(member.id)
+    toast.success('操作成功', result.message)
+    // 刷新部门数据
+    await departmentStore.fetchMyDepartment()
+    department.value = departmentStore.myDepartment
+    // 刷新仪表盘数据
+    if (department.value?.id) {
+      const dashboardResult = await getDepartmentDashboard(department.value.id).catch(() => null)
+      dashboard.value = dashboardResult ?? null
+    }
+  } catch (e) {
+    toast.error('操作失败', e instanceof Error ? e.message : '未知错误')
+  }
+}
+
+// 转让部门管理员
+async function handleTransferDepartmentAdmin(member: User) {
+  if (!confirm(`确定要将部门管理员权限转让给「${member.nickname || member.email}」吗？\n转让后您将成为普通部门成员。`)) {
+    return
+  }
+
+  try {
+    const result = await transferDepartmentAdmin(member.id)
+    toast.success('转让成功', result.message)
+    // 退出登录并跳转到登录页
+    authStore.logout()
+    router.push('/login')
+  } catch (e) {
+    toast.error('转让失败', e instanceof Error ? e.message : '未知错误')
   }
 }
 

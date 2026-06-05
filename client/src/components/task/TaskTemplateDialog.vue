@@ -28,9 +28,10 @@
                 <h4 class="font-medium text-gray-900">{{ template.title }}</h4>
                 <span
                   :class="{
-                    'bg-red-100 text-red-700': template.priority === 'HIGH',
-                    'bg-yellow-100 text-yellow-700': template.priority === 'MEDIUM',
-                    'bg-green-100 text-green-700': template.priority === 'LOW'
+                    'bg-red-100 text-red-700': template.priority === 'IMPORTANT_URGENT',
+                    'bg-blue-100 text-blue-700': template.priority === 'IMPORTANT_NOT_URGENT',
+                    'bg-orange-100 text-orange-700': template.priority === 'URGENT_NOT_IMPORTANT',
+                    'bg-gray-100 text-gray-600': template.priority === 'NOT_IMPORTANT_NOT_URGENT'
                   }"
                   class="text-xs px-2 py-0.5 rounded"
                 >
@@ -143,9 +144,10 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">优先级</label>
               <select v-model="templateForm.priority" class="input">
-                <option value="HIGH">高</option>
-                <option value="MEDIUM">中</option>
-                <option value="LOW">低</option>
+                <option value="IMPORTANT_URGENT">重要且紧急</option>
+                <option value="IMPORTANT_NOT_URGENT">重要不紧急</option>
+                <option value="URGENT_NOT_IMPORTANT">紧急不重要</option>
+                <option value="NOT_IMPORTANT_NOT_URGENT">不重要不紧急</option>
               </select>
             </div>
             <div class="flex justify-end gap-3 pt-4">
@@ -233,7 +235,7 @@ const deletingTemplate = ref<TaskTemplate | null>(null)
 const templateForm = reactive({
   title: '',
   description: '',
-  priority: 'MEDIUM' as Priority
+  priority: 'IMPORTANT_URGENT' as Priority
 })
 
 // 加载模板列表
@@ -256,9 +258,10 @@ function selectTemplate(template: TaskTemplate) {
 // 优先级标签
 function priorityLabel(priority: Priority): string {
   const labels: Record<Priority, string> = {
-    HIGH: '高',
-    MEDIUM: '中',
-    LOW: '低'
+    IMPORTANT_URGENT: '重要且紧急',
+    IMPORTANT_NOT_URGENT: '重要不紧急',
+    URGENT_NOT_IMPORTANT: '紧急不重要',
+    NOT_IMPORTANT_NOT_URGENT: '不重要不紧急'
   }
   return labels[priority]
 }
@@ -284,7 +287,7 @@ function cancelEdit() {
   editingTemplate.value = null
   templateForm.title = ''
   templateForm.description = ''
-  templateForm.priority = 'MEDIUM'
+  templateForm.priority = 'IMPORTANT_URGENT'
 }
 
 // 保存模板

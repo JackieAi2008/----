@@ -3,6 +3,7 @@
  */
 import { get } from '@/utils/request'
 import type { User } from '@/types/user'
+import type { ProjectCategory } from '@/types/project'
 
 // 通用仪表盘数据类型（用于个人仪表盘）
 export interface DashboardData {
@@ -46,6 +47,7 @@ export interface DashboardData {
     description?: string
     taskCount: number
     visibility?: 'PUBLIC' | 'PRIVATE'
+    category?: ProjectCategory | null
     _count?: { tasks: number }
   }>
 }

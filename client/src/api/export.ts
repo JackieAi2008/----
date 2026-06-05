@@ -9,7 +9,7 @@ export interface ExportParams {
   endDate?: string
   projectId?: string
   status?: string
-  summaryType?: 'weekly' | 'monthly' | 'quarterly'
+  summaryType?: 'weekly' | 'monthly' | 'quarterly' | 'yearly'
 }
 
 /**

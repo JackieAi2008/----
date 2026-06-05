@@ -4,18 +4,18 @@
  */
 import prisma from '../config/database.js'
 import { logger } from '../utils/logger.js'
+import webpush from 'web-push'
 
-// VAPID 配置（生产环境需要生成并配置到环境变量）
-// 生成命令: npx web-push generate-vapid-keys
+// VAPID 配置
 export const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || ''
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || ''
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@example.com'
 
-// 导出以避免未使用警告
-export const vapidConfig = {
-  publicKey: VAPID_PUBLIC_KEY,
-  privateKey: VAPID_PRIVATE_KEY,
-  subject: VAPID_SUBJECT
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
+  logger.info('[Push] VAPID configured, web-push ready')
+} else {
+  logger.warn('[Push] VAPID keys not configured, push notifications disabled')
 }
 
 // 推送订阅数据类型
@@ -123,11 +123,11 @@ export async function sendPushToUser(
 
   for (const sub of subscriptions) {
     try {
-      // 这里需要使用 web-push 库发送
-      // 由于 web-push 是可选依赖，这里提供接口
-      // 实际发送逻辑需要在安装 web-push 后实现
-
-      // 模拟发送成功
+      const pushSubscription = {
+        endpoint: sub.endpoint,
+        keys: JSON.parse(sub.keys as string) as { p256dh: string; auth: string }
+      }
+      await webpush.sendNotification(pushSubscription, JSON.stringify(payload))
       logger.info(`[Push] 发送通知给 ${userId}: ${payload.title}`)
       success++
     } catch (error) {

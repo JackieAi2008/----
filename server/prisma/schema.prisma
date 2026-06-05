@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Attachment {
-  id           String   @id
+  id           String   @id @default(cuid())
   taskId       String
   filename     String
   originalName String
@@ -22,7 +22,7 @@ model Attachment {
 }
 
 model AuditLog {
-  id         String   @id
+  id         String   @id @default(cuid())
   userId     String
   action     String
   targetType String
@@ -37,10 +37,11 @@ model AuditLog {
 }
 
 model Comment {
-  id        String    @id
+  id        String    @id @default(cuid())
   taskId    String
   userId    String
   content   String
+  type      String    @default("COMMENT")  // 'COMMENT' | 'PROGRESS'
   mentions  String?
   replyToId String?
   images    String?
@@ -50,15 +51,16 @@ model Comment {
   task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
+  @@index([type])
 }
 
 model Department {
-  id          String    @id
+  id          String    @id @default(cuid())
   name        String    @unique
   description String?
   adminId     String    @unique
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime  @updatedAt
   admin       User      @relation("Department_adminIdToUser", fields: [adminId], references: [id], onDelete: Cascade)
   projects    Project[]
   members     User[]    @relation("User_departmentIdToDepartment")
@@ -67,7 +69,7 @@ model Department {
 }
 
 model Notification {
-  id          String   @id
+  id          String   @id @default(cuid())
   userId      String
   type        String
   title       String
@@ -82,15 +84,18 @@ model Notification {
 }
 
 model Project {
-  id            String          @id
+  id            String          @id @default(cuid())
   name          String
   description   String?
   cover         String?
   visibility    String          @default("PRIVATE")
+  category      String?         // PARTY_BUILDING | TRADE_UNION | COMMUNIST_YOUTH_LEAGUE | PUBLIC_WELFARE | COMPREHENSIVE
   ownerId       String
   departmentId  String?
+  isArchived    Boolean         @default(false)
+  archivedAt    DateTime?
   createdAt     DateTime        @default(now())
-  updatedAt     DateTime
+  updatedAt     DateTime        @updatedAt
   deletedAt     DateTime?
   department    Department?     @relation(fields: [departmentId], references: [id])
   owner         User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -98,13 +103,16 @@ model Project {
   members       ProjectMember[]
   tasks         Task[]
   categories    TaskCategory[]
+  evaluations   Evaluation[]
 
   @@index([departmentId])
   @@index([visibility])
+  @@index([isArchived])
+  @@index([category])
 }
 
 model ProjectInvite {
-  id         String   @id
+  id         String   @id @default(cuid())
   projectId  String
   inviterId  String
   inviteeId  String
@@ -119,7 +127,7 @@ model ProjectInvite {
 }
 
 model ProjectMember {
-  id        String   @id
+  id        String   @id @default(cuid())
   projectId String
   userId    String
   role      String   @default("MEMBER")
@@ -131,20 +139,20 @@ model ProjectMember {
 }
 
 model PushSubscription {
-  id        String   @id
+  id        String   @id @default(cuid())
   userId    String
   endpoint  String   @unique
   keys      String
   userAgent String?
   createdAt DateTime @default(now())
-  updatedAt DateTime
+  updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model SecurityAnswer {
-  id            String   @id
+  id            String   @id @default(cuid())
   userId        String
   questionIndex Int
   answer        String
@@ -155,7 +163,7 @@ model SecurityAnswer {
 }
 
 model Task {
-  id             String             @id
+  id             String             @id @default(cuid())
   projectId      String
   title          String
   description    String?
@@ -163,9 +171,9 @@ model Task {
   dueDate        DateTime
   categoryId     String?
   assigneeId     String
-  priority       String             @default("MEDIUM")
+  priority       String             @default("IMPORTANT_URGENT")  // IMPORTANT_URGENT | IMPORTANT_NOT_URGENT | URGENT_NOT_IMPORTANT | NOT_IMPORTANT_NOT_URGENT
   status         String             @default("TODO")
-  visibility     String             @default("PRIVATE")  // PUBLIC/PRIVATE - 任务可见性
+  visibility     String             @default("PUBLIC")  // 固定为公开
   deliverable    String?
   tags           String?
   reminder       String?
@@ -173,8 +181,11 @@ model Task {
   creatorId      String
   isArchived     Boolean            @default(false)
   archivedAt     DateTime?
+  completedAt    DateTime?          // 完成时间，status→DONE 时自动记录
+  completedBy    String?            // 完成操作人 ID
+  completionNote String?            // 完成备注（用户填写）
   createdAt      DateTime           @default(now())
-  updatedAt      DateTime
+  updatedAt      DateTime           @updatedAt
   deletedAt      DateTime?
   attachments    Attachment[]
   comments       Comment[]
@@ -183,6 +194,7 @@ model Task {
   category       TaskCategory?      @relation(fields: [categoryId], references: [id])
   project        Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   collaborators  TaskCollaborator[]
+  evaluations    Evaluation[]
 
   @@index([isArchived])
   @@index([status])
@@ -191,7 +203,7 @@ model Task {
 }
 
 model TaskCategory {
-  id           String         @id
+  id           String         @id @default(cuid())
   projectId    String?
   name         String
   color        String
@@ -203,7 +215,7 @@ model TaskCategory {
 }
 
 model TaskCollaborator {
-  id     String @id
+  id     String @id @default(cuid())
   taskId String
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -213,15 +225,15 @@ model TaskCollaborator {
 }
 
 model TaskTemplate {
-  id              String        @id
+  id              String        @id @default(cuid())
   title           String
   description     String?
-  priority        String        @default("MEDIUM")
+  priority        String        @default("IMPORTANT_URGENT")
   categoryId      String?
   defaultAssignee String?
   creatorId       String
   createdAt       DateTime      @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime      @updatedAt
   category        TaskCategory? @relation(fields: [categoryId], references: [id])
   creator         User          @relation(fields: [creatorId], references: [id], onDelete: Cascade)
 
@@ -229,7 +241,7 @@ model TaskTemplate {
 }
 
 model User {
-  id                                          String             @id
+  id                                          String             @id @default(cuid())
   email                                       String             @unique
   password                                    String
   nickname                                    String
@@ -239,7 +251,7 @@ model User {
   isBanned                                    Boolean            @default(false)
   departmentId                                String?
   createdAt                                   DateTime           @default(now())
-  updatedAt                                   DateTime
+  updatedAt                                   DateTime           @updatedAt
   attachments                                 Attachment[]
   auditLogs                                   AuditLog[]
   comments                                    Comment[]
@@ -256,6 +268,30 @@ model User {
   taskCollaborations                          TaskCollaborator[]
   taskTemplates                               TaskTemplate[]
   department                                  Department?        @relation("User_departmentIdToDepartment", fields: [departmentId], references: [id])
+  givenEvaluations                            Evaluation[]       @relation("Evaluation_evaluator")
+  receivedEvaluations                         Evaluation[]       @relation("Evaluation_target")
 
   @@index([departmentId])
+}
+
+model Evaluation {
+  id           String   @id @default(cuid())
+  taskId       String
+  evaluatorId  String   // 评价人（全局管理者）
+  targetUserId String   // 被评价人
+  projectId    String   // 所属项目
+  rating       Int      // 1-5 星
+  comment      String?  // 评价备注
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  evaluator   User    @relation("Evaluation_evaluator", fields: [evaluatorId], references: [id], onDelete: Cascade)
+  targetUser  User    @relation("Evaluation_target", fields: [targetUserId], references: [id], onDelete: Cascade)
+  task        Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  project     Project @relation(fields: [projectId], references: [id])
+
+  @@unique([taskId, targetUserId, evaluatorId])
+  @@index([evaluatorId])
+  @@index([targetUserId])
+  @@index([projectId])
 }

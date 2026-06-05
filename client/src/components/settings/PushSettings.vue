@@ -7,13 +7,18 @@
       您的浏览器不支持推送通知功能
     </div>
 
-    <!-- 权限被拒绝 -->
-    <div v-else-if="permission === 'denied'" class="p-4 bg-red-50 rounded-lg text-red-700 text-sm">
-      推送通知已被禁用。请在浏览器设置中开启通知权限。
-    </div>
-
-    <!-- 正常状态 -->
     <template v-else>
+      <!-- 权限被拒绝时的引导 -->
+      <div v-if="permission === 'denied'" class="p-3 bg-amber-50 rounded-lg text-amber-700 text-sm mb-4">
+        <p class="font-medium mb-1">浏览器通知权限已关闭</p>
+        <p>请按以下步骤开启：</p>
+        <ol class="list-decimal list-inside mt-1 space-y-0.5 text-xs">
+          <li>点击地址栏左侧的 <strong>锁头图标</strong></li>
+          <li>找到「通知」，改为 <strong>允许</strong></li>
+          <li>刷新页面</li>
+        </ol>
+      </div>
+
       <div class="flex items-center justify-between mb-4">
         <div>
           <p class="text-gray-800">启用推送通知</p>
@@ -68,9 +73,6 @@
 </template>
 
 <script setup lang="ts">
-/**
- * 中集智历 - 推送通知设置组件
- */
 import { ref, onMounted } from 'vue'
 import {
   isPushSupported,
@@ -100,12 +102,9 @@ onMounted(async () => {
   isSupported.value = isPushSupported()
 
   if (isSupported.value) {
-    // 检查权限状态
     if ('Notification' in window) {
       permission.value = Notification.permission
     }
-
-    // 获取订阅状态
     await fetchStatus()
   }
 })
@@ -124,11 +123,15 @@ async function togglePush() {
 
   try {
     if (subscribed.value) {
-      // 取消订阅
       await unsubscribeFromPush()
       subscribed.value = false
     } else {
-      // 订阅
+      const perm = await Notification.requestPermission()
+      permission.value = perm
+      if (perm !== 'granted') {
+        toast('需要允许通知权限才能开启推送', 'error')
+        return
+      }
       await subscribeToPush()
       subscribed.value = true
     }
@@ -157,14 +160,12 @@ async function handleTestNotification() {
 
 function getDeviceName(userAgent?: string): string {
   if (!userAgent) return '未知设备'
-
   if (userAgent.includes('iPhone')) return 'iPhone'
   if (userAgent.includes('iPad')) return 'iPad'
   if (userAgent.includes('Android')) return 'Android 设备'
   if (userAgent.includes('Mac')) return 'Mac'
   if (userAgent.includes('Windows')) return 'Windows 电脑'
   if (userAgent.includes('Linux')) return 'Linux 电脑'
-
   return '其他设备'
 }
 </script>

@@ -57,6 +57,46 @@ async function main() {
     console.log('请及时修改默认密码!')
   }
 
+  // 创建5个默认项目（党建工作、工会工作、共青团工作、公益工作、综合工作）
+  const defaultProjects = [
+    { name: '党建工作', category: 'PARTY_BUILDING', description: '党建相关工作项目' },
+    { name: '工会工作', category: 'TRADE_UNION', description: '工会相关工作项目' },
+    { name: '共青团工作', category: 'COMMUNIST_YOUTH_LEAGUE', description: '共青团相关工作项目' },
+    { name: '公益工作', category: 'PUBLIC_WELFARE', description: '公益活动相关工作项目' },
+    { name: '综合工作', category: 'COMPREHENSIVE', description: '综合性工作项目' }
+  ]
+
+  // 获取管理员用户作为项目owner
+  const admin = await prisma.user.findFirst({ where: { isAdmin: true } })
+  if (admin) {
+    for (const proj of defaultProjects) {
+      const existing = await prisma.project.findFirst({
+        where: { name: proj.name, deletedAt: null }
+      })
+
+      if (!existing) {
+        const project = await prisma.project.create({
+          data: {
+            name: proj.name,
+            description: proj.description,
+            category: proj.category,
+            visibility: 'PUBLIC',
+            ownerId: admin.id
+          }
+        })
+        // 添加管理员为项目owner成员
+        await prisma.projectMember.create({
+          data: {
+            projectId: project.id,
+            userId: admin.id,
+            role: 'OWNER'
+          }
+        })
+        console.log(`创建默认项目: ${proj.name} (${proj.category})`)
+      }
+    }
+  }
+
   console.log('数据库初始化完成!')
 }
 

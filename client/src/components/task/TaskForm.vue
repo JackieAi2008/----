@@ -43,9 +43,30 @@
           <div class="flex gap-2">
             <select v-model="form.projectId" class="input flex-1" required @change="handleProjectChange">
               <option value="">请选择项目</option>
-              <option v-for="project in projects" :key="project.id" :value="project.id">
-                {{ project.name }}
-              </option>
+              <!-- 按5个固定分类分组 -->
+              <optgroup
+                v-for="cat in projectCategories"
+                :key="cat.value"
+                :label="cat.label"
+              >
+                <option
+                  v-for="project in getProjectsByCategory(cat.value)"
+                  :key="project.id"
+                  :value="project.id"
+                >
+                  {{ project.name }}
+                </option>
+              </optgroup>
+              <!-- 未分类项目 -->
+              <optgroup v-if="uncategorizedProjects.length > 0" label="其他项目">
+                <option
+                  v-for="project in uncategorizedProjects"
+                  :key="project.id"
+                  :value="project.id"
+                >
+                  {{ project.name }}
+                </option>
+              </optgroup>
             </select>
             <button
               type="button"
@@ -58,14 +79,14 @@
           </div>
         </div>
 
-        <!-- 任务描述 -->
+        <!-- 核心工作及关键节点（原"任务描述"） -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">任务描述</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">核心工作及关键节点</label>
           <textarea
             v-model="form.description"
             class="input"
             rows="3"
-            placeholder="请输入任务描述"
+            placeholder="请输入核心工作及关键节点"
           ></textarea>
         </div>
 
@@ -160,21 +181,14 @@
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">优先级</label>
             <select v-model="form.priority" class="input">
-              <option value="LOW">低</option>
-              <option value="MEDIUM">中</option>
-              <option value="HIGH">高</option>
+              <option v-for="(info, key) in priorityMap" :key="key" :value="key">
+                {{ info.label }}
+              </option>
             </select>
           </div>
         </div>
 
-        <!-- 可见性 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">可见性</label>
-          <select v-model="form.visibility" class="input">
-            <option value="PRIVATE">私密（仅参与者可见）</option>
-            <option value="PUBLIC">公开（项目成员可见）</option>
-          </select>
-        </div>
+        <!-- 可见性：固定为公开，隐藏选择器 -->
 
         <!-- 提醒设置 -->
         <div class="grid grid-cols-2 gap-4">
@@ -182,10 +196,10 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">提醒</label>
             <select v-model="form.reminder" class="input">
               <option value="">不提醒</option>
-              <option value="FIFTEEN_MIN">提前15分钟</option>
-              <option value="ONE_HOUR">提前1小时</option>
-              <option value="ONE_DAY">提前1天</option>
-              <option value="THREE_DAYS">提前3天</option>
+              <option value="TWO_WEEKS">提前两周</option>
+              <option value="ONE_WEEK">提前一周</option>
+              <option value="THREE_DAYS">提前三天</option>
+              <option value="ONE_DAY">提前一天</option>
             </select>
           </div>
           <div>
@@ -200,76 +214,39 @@
           </div>
         </div>
 
-        <!-- 交付成果 -->
+        <!-- 交付成果：下拉选择 -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">交付成果</label>
-          <input
-            v-model="form.deliverable"
-            type="text"
-            class="input"
-            placeholder="请输入需要提交的产出物"
-          />
+          <select v-model="form.deliverable" class="input">
+            <option value="">请选择交付成果</option>
+            <option v-for="opt in deliverableOptions" :key="opt" :value="opt">
+              {{ opt }}
+            </option>
+          </select>
         </div>
 
-        <!-- 标签 -->
+        <!-- 标签：固定三选 -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">标签</label>
-          <div class="space-y-2">
-            <!-- 已选标签 -->
-            <div v-if="form.tags.length > 0" class="flex flex-wrap gap-2">
-              <span
-                v-for="tag in form.tags"
-                :key="tag"
-                class="inline-flex items-center gap-1 px-2 py-1 text-sm rounded-full"
-                :class="getTagColorClass(tag)"
-              >
-                {{ tag }}
-                <button
-                  type="button"
-                  @click="removeTag(tag)"
-                  class="hover:opacity-70"
-                >
-                  <X class="w-3 h-3" />
-                </button>
-              </span>
-            </div>
-            <!-- 标签输入 -->
-            <div class="flex gap-2">
+          <div class="flex flex-wrap gap-3">
+            <label
+              v-for="tag in fixedTags"
+              :key="tag"
+              class="flex items-center gap-2 cursor-pointer"
+            >
               <input
-                v-model="newTagInput"
-                type="text"
-                class="input flex-1"
-                placeholder="输入标签名后按回车添加"
-                maxlength="20"
-                @keydown.enter.prevent="addTag"
+                type="checkbox"
+                :checked="form.tags.includes(tag)"
+                @change="toggleTag(tag)"
+                class="rounded text-blue-600"
               />
-              <button
-                type="button"
-                @click="addTag"
-                :disabled="!newTagInput.trim()"
-                class="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                添加
-              </button>
-            </div>
-            <!-- 可选标签 -->
-            <div v-if="availableTags.length > 0" class="flex flex-wrap gap-1">
-              <span class="text-xs text-gray-500 mr-1">快速选择:</span>
-              <button
-                v-for="tag in availableTags"
-                :key="tag"
-                type="button"
-                @click="selectTag(tag)"
-                :disabled="form.tags.includes(tag)"
-                class="px-2 py-0.5 text-xs rounded-full transition-colors"
-                :class="[
-                  getTagColorClass(tag),
-                  form.tags.includes(tag) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'
-                ]"
+              <span
+                class="px-2 py-1 text-sm rounded-full"
+                :class="form.tags.includes(tag) ? getTagColorClass(tag) : 'bg-gray-100 text-gray-500'"
               >
                 {{ tag }}
-              </button>
-            </div>
+              </span>
+            </label>
           </div>
         </div>
 
@@ -321,7 +298,14 @@
 
 <script setup lang="ts">
 /**
- * 中集智历 - 任务表单组件
+ * 中集智历 - 任务表单组件（优化版）
+ * 优化项：
+ * - 需求2：任务描述 → 核心工作及关键节点
+ * - 需求4：优先级改为四象限
+ * - 需求5：可见性固定为公开
+ * - 需求6：提醒时间改为两周/一周/三天/一天
+ * - 需求7：交付成果改为下拉选择
+ * - 需求8：标签固定为三种
  */
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { X, FileText, Plus } from 'lucide-vue-next'
@@ -336,7 +320,16 @@ import { devLog } from '@/utils/logger'
 import { getTagColorClasses } from '@/utils/tagColor'
 import TaskTemplateDialog from './TaskTemplateDialog.vue'
 import QuickCreateProjectDialog from '@/components/project/QuickCreateProjectDialog.vue'
-import type { TaskCategory, Reminder, Repeat, TaskTemplate } from '@/types/task'
+import {
+  PRIORITY_MAP,
+  FIXED_TAGS,
+  DELIVERABLE_OPTIONS,
+  type Priority,
+  type Reminder,
+  type Repeat,
+  type TaskTemplate,
+} from '@/types/task'
+import { PROJECT_CATEGORY_OPTIONS, type ProjectCategory } from '@/types/project'
 import type { ProjectMember } from '@/types/project'
 import type { User } from '@/types/user'
 
@@ -353,13 +346,18 @@ const emit = defineEmits<{
 const projectStore = useProjectStore()
 const authStore = useAuthStore()
 
+// 常量导出到模板
+const priorityMap = PRIORITY_MAP
+const fixedTags = FIXED_TAGS
+const deliverableOptions = DELIVERABLE_OPTIONS
+const projectCategories = PROJECT_CATEGORY_OPTIONS
+
 // 状态
 const submitting = ref(false)
 const savingTemplate = ref(false)
 const members = ref<ProjectMember[]>([])
-const categories = ref<TaskCategory[]>([])
+const categories = ref<{ id: string; name: string; color: string; isSystem: boolean }[]>([])
 const availableTags = ref<string[]>([])
-const newTagInput = ref('')
 const showTemplateDialog = ref(false)
 const showQuickCreateProject = ref(false)
 const assigneeSearchKeyword = ref('')
@@ -375,8 +373,8 @@ const form = reactive({
   dueDate: '',
   assigneeId: '',
   categoryId: '',
-  priority: 'MEDIUM' as 'HIGH' | 'MEDIUM' | 'LOW',
-  visibility: 'PRIVATE' as 'PUBLIC' | 'PRIVATE',  // 新增：任务可见性
+  priority: 'IMPORTANT_URGENT' as Priority,
+  visibility: 'PUBLIC' as 'PUBLIC' | 'PRIVATE',  // 固定公开
   reminder: '',
   repeat: '',
   deliverable: '',
@@ -387,18 +385,28 @@ const form = reactive({
 const projects = computed(() => projectStore.activeProjects)
 const isEdit = computed(() => !!props.taskId)
 const canSearchCrossDept = computed(() => {
-  // 只有项目负责人和管理员可以跨部门分配任务
   const currentProject = projects.value.find(p => p.id === form.projectId)
   return authStore.isAdmin || currentProject?.ownerId === authStore.user?.id
 })
 
-// 初始化截止日期
+// 按分类分组项目
+function getProjectsByCategory(category: ProjectCategory) {
+  return projects.value.filter(p => (p as any).category === category)
+}
+
+const uncategorizedProjects = computed(() => {
+  const categorizedIds = new Set(
+    PROJECT_CATEGORY_OPTIONS.flatMap(cat => getProjectsByCategory(cat.value).map(p => p.id))
+  )
+  return projects.value.filter(p => !categorizedIds.has(p.id))
+})
+
+// 初始化日期（新建任务时默认为点击当天）
 watch(() => props.date, (newDate) => {
   if (newDate && !props.taskId) {
-    // 设置默认截止时间为当天18:00
-    const dueDate = new Date(newDate)
-    dueDate.setHours(18, 0, 0, 0)
-    form.dueDate = formatDateTime(dueDate, 'YYYY-MM-DDTHH:mm')
+    const dateStr = formatDateTime(new Date(newDate), 'YYYY-MM-DD')
+    form.startDate = `${dateStr}T00:00`
+    form.dueDate = `${dateStr}T00:00`
   }
 }, { immediate: true })
 
@@ -499,7 +507,7 @@ async function handleSubmit() {
       assigneeId: form.assigneeId,
       categoryId: form.categoryId || undefined,
       priority: form.priority,
-      visibility: form.visibility,  // 新增：任务可见性
+      visibility: 'PUBLIC' as const,  // 固定公开
       reminder: (form.reminder || undefined) as Reminder | undefined,
       repeat: (form.repeat || undefined) as Repeat | undefined,
       deliverable: form.deliverable || undefined,
@@ -527,35 +535,21 @@ function getTagColorClass(tagName: string): string {
   return `${colors.bg} ${colors.text}`
 }
 
-function addTag() {
-  const tagName = newTagInput.value.trim()
-  if (!tagName) return
-  if (form.tags.includes(tagName)) {
-    newTagInput.value = ''
-    return
-  }
-  form.tags.push(tagName)
-  newTagInput.value = ''
-}
-
-function removeTag(tagName: string) {
-  form.tags = form.tags.filter(t => t !== tagName)
-}
-
-function selectTag(tagName: string) {
-  if (!form.tags.includes(tagName)) {
+function toggleTag(tagName: string) {
+  const idx = form.tags.indexOf(tagName)
+  if (idx === -1) {
     form.tags.push(tagName)
+  } else {
+    form.tags.splice(idx, 1)
   }
 }
 
 // 应用模板
 function applyTemplate(template: TaskTemplate) {
-  // 填充表单字段
   form.title = template.title
   form.description = template.description || ''
   form.priority = template.priority
 
-  // 如果模板有类别，设置为模板的类别
   if (template.categoryId) {
     form.categoryId = template.categoryId
   }
@@ -564,7 +558,6 @@ function applyTemplate(template: TaskTemplate) {
 // 处理快速创建项目成功
 async function handleProjectCreated(project: { id: string; name: string }) {
   showQuickCreateProject.value = false
-  // 自动选中新项目
   form.projectId = project.id
   await handleProjectChange()
 }
@@ -601,7 +594,6 @@ onMounted(async () => {
   if (isEdit.value) {
     await loadTask()
   } else if (projects.value.length === 1) {
-    // 如果只有一个项目，自动选中
     form.projectId = projects.value[0].id
     await handleProjectChange()
   }

@@ -86,7 +86,7 @@ export async function createTemplate(req: Request, res: Response) {
     data: {
       title,
       description,
-      priority: priority || 'MEDIUM',
+      priority: priority || 'IMPORTANT_NOT_URGENT',
       categoryId,
       defaultAssignee,
       creatorId: userId!

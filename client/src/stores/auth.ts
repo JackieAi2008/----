@@ -11,6 +11,14 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const token = ref<string | null>(localStorage.getItem('token'))
 
+  // 从 localStorage 恢复用户信息（避免刷新后闪烁为普通用户）
+  try {
+    const cached = localStorage.getItem('user')
+    if (cached && token.value) {
+      user.value = JSON.parse(cached)
+    }
+  } catch {}
+
   // 计算属性
   const isAuthenticated = computed(() => !!token.value)
   const isAdmin = computed(() => user.value?.isAdmin ?? false)
@@ -25,6 +33,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = response.token
     user.value = response.user
     localStorage.setItem('token', response.token)
+    localStorage.setItem('user', JSON.stringify(response.user))
     return response
   }
 
@@ -41,6 +50,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = response.token
     user.value = response.user
     localStorage.setItem('token', response.token)
+    localStorage.setItem('user', JSON.stringify(response.user))
     return response
   }
 
@@ -49,6 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     token.value = null
     localStorage.removeItem('token')
+    localStorage.removeItem('user')
   }
 
   // 获取当前用户信息
@@ -57,6 +68,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const response = await authApi.getCurrentUser()
       user.value = response
+      localStorage.setItem('user', JSON.stringify(response))
       return response
     } catch {
       logout()

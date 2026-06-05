@@ -1,9 +1,9 @@
 <template>
-  <div class="reports-page p-6">
+  <div class="reports-page p-6 max-w-6xl mx-auto">
     <!-- 页面标题 -->
     <div class="mb-6">
       <h1 class="text-2xl font-bold text-gray-800">总结归档</h1>
-      <p class="text-gray-500 mt-1">查看工作统计和生成工作总结</p>
+      <p class="text-gray-500 mt-1">查看工作统计和生成AI智能工作总结</p>
     </div>
 
     <!-- 时间范围选择 -->
@@ -27,187 +27,68 @@
             </button>
           </div>
         </div>
-
-        <!-- 导出按钮组 -->
-        <div class="flex items-center gap-2">
-          <span class="text-sm text-gray-600">导出：</span>
-          <button
-            @click="handleExportICS"
-            :disabled="exporting.ics"
-            class="px-3 py-1.5 text-sm bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-            title="导出日历文件（可导入手机/电脑日历）"
-          >
-            <svg v-if="!exporting.ics" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <svg v-else class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            日历文件
-          </button>
-          <button
-            @click="handleExportExcel"
-            :disabled="exporting.excel"
-            class="px-3 py-1.5 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-            title="导出Excel/CSV格式任务列表"
-          >
-            <svg v-if="!exporting.excel" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <svg v-else class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Excel表格
-          </button>
-          <button
-            @click="handleExportPDF"
-            :disabled="exporting.pdf"
-            class="px-3 py-1.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-            title="导出工作总结文档"
-          >
-            <svg v-if="!exporting.pdf" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-            <svg v-else class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            工作总结
-          </button>
-        </div>
       </div>
     </div>
 
     <!-- 加载状态 -->
     <div v-if="loading" class="text-center py-12 text-gray-500">
+      <div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
       加载中...
     </div>
 
+    <!-- 错误状态 -->
+    <div v-else-if="error" class="text-center py-12">
+      <div class="text-red-500 mb-4">{{ error }}</div>
+      <button @click="loadData" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+        重新加载
+      </button>
+    </div>
+
+    <!-- 统计内容 -->
     <template v-else>
       <!-- 统计卡片 -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <!-- 总任务数 -->
-        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white shadow-lg shadow-blue-200">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-blue-100 text-sm font-medium">总任务数</p>
-              <p class="text-4xl font-bold mt-2">{{ stats.total }}</p>
-              <p class="text-blue-200 text-xs mt-1">选定时间范围内</p>
-            </div>
-            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
-              <ClipboardList class="w-7 h-7" />
-            </div>
-          </div>
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white">
+          <p class="text-blue-100 text-sm font-medium">总任务数</p>
+          <p class="text-4xl font-bold mt-2">{{ stats.total }}</p>
         </div>
 
         <!-- 已完成 -->
-        <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg shadow-green-200">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-green-100 text-sm font-medium">已完成</p>
-              <p class="text-4xl font-bold mt-2">{{ stats.done }}</p>
-              <p class="text-green-200 text-xs mt-1">完成率 {{ completionRate }}%</p>
-            </div>
-            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
-              <CheckCircle class="w-7 h-7" />
-            </div>
-          </div>
+        <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-5 text-white">
+          <p class="text-green-100 text-sm font-medium">已完成</p>
+          <p class="text-4xl font-bold mt-2">{{ stats.done }}</p>
+          <p class="text-green-200 text-xs mt-1">完成率 {{ completionRate }}%</p>
         </div>
 
         <!-- 进行中 -->
-        <div class="bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl p-5 text-white shadow-lg shadow-amber-200">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-amber-100 text-sm font-medium">进行中</p>
-              <p class="text-4xl font-bold mt-2">{{ stats.inProgress }}</p>
-              <p class="text-amber-200 text-xs mt-1">正在处理</p>
-            </div>
-            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
-              <Clock class="w-7 h-7" />
-            </div>
-          </div>
+        <div class="bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl p-5 text-white">
+          <p class="text-amber-100 text-sm font-medium">进行中</p>
+          <p class="text-4xl font-bold mt-2">{{ stats.inProgress }}</p>
         </div>
 
-        <!-- 逾期任务 -->
-        <div class="bg-gradient-to-br from-red-500 to-rose-600 rounded-xl p-5 text-white shadow-lg shadow-red-200">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-red-100 text-sm font-medium">逾期任务</p>
-              <p class="text-4xl font-bold mt-2">{{ stats.overdue }}</p>
-              <p class="text-red-200 text-xs mt-1">需要关注</p>
-            </div>
-            <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
-              <AlertTriangle class="w-7 h-7" />
-            </div>
-          </div>
+        <!-- 待办 -->
+        <div class="bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl p-5 text-white">
+          <p class="text-gray-100 text-sm font-medium">待办</p>
+          <p class="text-4xl font-bold mt-2">{{ stats.todo }}</p>
         </div>
       </div>
 
-      <!-- 任务状态分布 -->
+      <!-- 任务状态分布 & 项目参与 -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div class="bg-white rounded-lg border border-gray-200 p-6">
           <h3 class="text-lg font-semibold text-gray-800 mb-4">任务状态分布</h3>
           <div class="space-y-3">
-            <div class="flex items-center justify-between">
+            <div v-for="item in statusList" :key="item.status" class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <div class="w-3 h-3 rounded-full bg-gray-400"></div>
-                <span class="text-sm text-gray-600">待办</span>
+                <div class="w-3 h-3 rounded-full" :class="item.color"></div>
+                <span class="text-sm text-gray-600">{{ item.label }}</span>
               </div>
               <div class="flex items-center gap-2">
                 <div class="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    class="h-full bg-gray-400 rounded-full"
-                    :style="{ width: getStatusPercent('TODO') + '%' }"
-                  ></div>
+                  <div class="h-full rounded-full" :class="item.color" :style="{ width: getPercent(statusCounts[item.status]) + '%' }"></div>
                 </div>
-                <span class="text-sm text-gray-600 w-12 text-right">{{ statusCounts.TODO || 0 }}</span>
-              </div>
-            </div>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <div class="w-3 h-3 rounded-full bg-blue-500"></div>
-                <span class="text-sm text-gray-600">进行中</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <div class="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    class="h-full bg-blue-500 rounded-full"
-                    :style="{ width: getStatusPercent('IN_PROGRESS') + '%' }"
-                  ></div>
-                </div>
-                <span class="text-sm text-gray-600 w-12 text-right">{{ statusCounts.IN_PROGRESS || 0 }}</span>
-              </div>
-            </div>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <div class="w-3 h-3 rounded-full bg-green-500"></div>
-                <span class="text-sm text-gray-600">已完成</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <div class="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    class="h-full bg-green-500 rounded-full"
-                    :style="{ width: getStatusPercent('DONE') + '%' }"
-                  ></div>
-                </div>
-                <span class="text-sm text-gray-600 w-12 text-right">{{ statusCounts.DONE || 0 }}</span>
-              </div>
-            </div>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <div class="w-3 h-3 rounded-full bg-red-400"></div>
-                <span class="text-sm text-gray-600">已取消</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <div class="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    class="h-full bg-red-400 rounded-full"
-                    :style="{ width: getStatusPercent('CANCELLED') + '%' }"
-                  ></div>
-                </div>
-                <span class="text-sm text-gray-600 w-12 text-right">{{ statusCounts.CANCELLED || 0 }}</span>
+                <span class="text-sm text-gray-600 w-12 text-right">{{ statusCounts[item.status] }}</span>
               </div>
             </div>
           </div>
@@ -220,135 +101,256 @@
             暂无项目数据
           </div>
           <div v-else class="space-y-3">
-            <div
-              v-for="project in projectStats"
-              :key="project.projectId"
-              class="flex items-center justify-between"
-            >
+            <div v-for="project in projectStats" :key="project.projectId" class="flex items-center justify-between">
               <span class="text-sm text-gray-600 truncate" :title="project.projectName">
                 {{ project.projectName }}
               </span>
-              <div class="flex items-center gap-2">
-                <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    class="h-full bg-blue-500 rounded-full"
-                    :style="{ width: getProjectPercent(project.count) + '%' }"
-                  ></div>
-                </div>
-                <span class="text-sm text-gray-600 w-8 text-right">{{ project.count }}</span>
-              </div>
+              <span class="text-sm text-gray-600">{{ project.count }} 项任务</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 完成趋势 -->
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-        <div class="flex items-center justify-between mb-6">
-          <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            <TrendingUp class="w-5 h-5 text-green-600" />
-            完成趋势
-          </h3>
-          <div class="flex items-center gap-4 text-sm">
-            <span class="flex items-center gap-1.5">
-              <div class="w-3 h-3 rounded-full bg-gradient-to-t from-blue-500 to-blue-400"></div>
-              <span class="text-gray-500">完成任务数</span>
-            </span>
-          </div>
-        </div>
-
-        <div v-if="trendData.length === 0 || trendData.every(d => d.count === 0)" class="text-center py-12">
-          <BarChart3 class="w-16 h-16 text-gray-200 mx-auto mb-3" />
-          <p class="text-gray-400">暂无趋势数据</p>
-          <p class="text-gray-300 text-sm mt-1">完成任务后将在此显示趋势</p>
-        </div>
-
-        <div v-else class="relative">
-          <!-- Y轴刻度 -->
-          <div class="absolute left-0 top-0 bottom-8 w-10 flex flex-col justify-between text-xs text-gray-400">
-            <span>{{ maxTrendValue }}</span>
-            <span>{{ Math.round(maxTrendValue / 2) }}</span>
-            <span>0</span>
-          </div>
-
-          <!-- 图表区域 -->
-          <div class="ml-12">
-            <!-- 网格线 -->
-            <div class="absolute left-12 right-0 top-0 h-40 flex flex-col justify-between pointer-events-none">
-              <div class="border-b border-gray-100"></div>
-              <div class="border-b border-gray-100"></div>
-              <div class="border-b border-gray-100"></div>
-            </div>
-
-            <!-- 柱状图 -->
-            <div class="h-40 flex items-end justify-around gap-2 relative">
-              <div
-                v-for="(day, index) in trendData"
-                :key="index"
-                class="flex flex-col items-center group flex-1"
-              >
-                <!-- 数值提示 -->
-                <div class="opacity-0 group-hover:opacity-100 transition-opacity mb-1 bg-gray-800 text-white text-xs px-2 py-1 rounded">
-                  {{ day.count }} 项
-                </div>
-                <!-- 柱子 -->
-                <div
-                  class="w-full max-w-[40px] rounded-t-lg transition-all duration-300 group-hover:opacity-80 relative overflow-hidden"
-                  :class="day.count > 0 ? 'bg-gradient-to-t from-blue-600 to-blue-400 shadow-md shadow-blue-200' : 'bg-gray-200'"
-                  :style="{ height: getBarHeight(day.count) + 'px' }"
-                >
-                  <div v-if="day.count > 0" class="absolute top-0 left-0 right-0 h-1 bg-white/30 rounded-t-lg"></div>
-                </div>
-                <span class="text-xs text-gray-500 mt-2 font-medium">{{ day.label }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 工作总结生成 -->
+      <!-- AI 智能总结 -->
       <div class="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">工作总结</h3>
-        <div class="mb-4">
-          <label class="block text-sm text-gray-600 mb-2">总结类型：</label>
-          <select
-            v-model="summaryType"
-            class="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="weekly">周总结</option>
-            <option value="monthly">月总结</option>
-            <option value="quarterly">季度总结</option>
-          </select>
-        </div>
-        <div class="flex gap-2">
-          <button
-            @click="generateSummary"
-            :disabled="generating"
-            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {{ generating ? '生成中...' : '生成总结' }}
-          </button>
-          <button
-            v-if="summary"
-            @click="downloadCurrentSummary"
-            class="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-          >
-            下载总结
-          </button>
-        </div>
-
-        <!-- 生成的总结 -->
-        <div v-if="summary" class="mt-6 p-4 bg-gray-50 rounded-lg">
-          <div class="flex items-center justify-between mb-3">
-            <h4 class="font-medium text-gray-800">{{ summary.title }}</h4>
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div class="flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+            </svg>
+            <h3 class="text-lg font-semibold text-gray-800">AI 智能总结</h3>
+          </div>
+          <div class="flex items-center gap-3">
+            <select v-model="summaryType" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+              <option value="weekly">周总结</option>
+              <option value="monthly">月总结</option>
+              <option value="quarterly">季度总结</option>
+              <option value="yearly">年度总结</option>
+            </select>
             <button
-              @click="copySummary"
-              class="text-sm text-blue-600 hover:text-blue-700"
+              @click="handleGenerateSummary"
+              :disabled="aiLoading"
+              class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
             >
-              复制
+              {{ aiLoading ? '生成中...' : '生成总结' }}
             </button>
           </div>
-          <div class="text-sm text-gray-600 whitespace-pre-wrap">{{ summary.content }}</div>
+        </div>
+
+        <!-- 加载中：骨架屏 -->
+        <div v-if="aiLoading" class="py-8">
+          <div class="flex items-center gap-3 mb-6">
+            <div class="animate-spin w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full"></div>
+            <div>
+              <p class="text-gray-700 font-medium">正在分析工作数据...</p>
+              <p class="text-gray-400 text-sm">AI 正在生成您的{{ summaryTypeLabel }}总结，请稍候</p>
+            </div>
+          </div>
+          <!-- 骨架屏 -->
+          <div class="space-y-6">
+            <div>
+              <div class="h-4 bg-gray-100 rounded w-24 mb-3 animate-pulse"></div>
+              <div class="h-3 bg-gray-100 rounded w-full mb-2 animate-pulse"></div>
+              <div class="h-3 bg-gray-100 rounded w-3/4 animate-pulse"></div>
+            </div>
+            <div>
+              <div class="h-4 bg-gray-100 rounded w-20 mb-3 animate-pulse"></div>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="h-20 bg-gray-50 rounded-lg animate-pulse"></div>
+                <div class="h-20 bg-gray-50 rounded-lg animate-pulse"></div>
+              </div>
+            </div>
+            <div>
+              <div class="h-4 bg-gray-100 rounded w-28 mb-3 animate-pulse"></div>
+              <div class="h-3 bg-gray-100 rounded w-full mb-2 animate-pulse"></div>
+              <div class="h-3 bg-gray-100 rounded w-2/3 animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 错误状态 -->
+        <div v-else-if="aiError" class="text-center py-8">
+          <svg class="w-12 h-12 mx-auto mb-3 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+          <p class="text-red-500 mb-3">{{ aiError }}</p>
+          <button @click="handleGenerateSummary" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+            重新生成
+          </button>
+        </div>
+
+        <!-- AI 总结展示 -->
+        <div v-else-if="aiSummary" class="space-y-6">
+          <!-- 降级提示 -->
+          <div v-if="aiSummary.fallback" class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2">
+            <p class="text-amber-700 text-sm">{{ aiSummary.fallbackMessage }}</p>
+            <pre class="text-sm text-gray-600 whitespace-pre-wrap font-sans mt-2">{{ aiSummary.basicContent }}</pre>
+          </div>
+
+          <!-- 正常 AI 总结内容 -->
+          <template v-if="aiSummary.sections">
+            <!-- 1. 个人工作总结 -->
+            <section>
+              <h4 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <span class="w-1 h-5 bg-blue-500 rounded-full"></span>
+                个人工作总结
+              </h4>
+              <div class="bg-blue-50 rounded-lg p-4">
+                <p class="text-gray-700 text-sm leading-relaxed">{{ aiSummary.sections.personalSummary.overview }}</p>
+              </div>
+              <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div v-if="aiSummary.sections.personalSummary.completedWork?.length" class="bg-green-50 rounded-lg p-3">
+                  <p class="text-green-700 text-xs font-medium mb-2">✅ 已完成</p>
+                  <ul class="space-y-1">
+                    <li v-for="(item, i) in aiSummary.sections.personalSummary.completedWork" :key="'done-' + i"
+                      class="text-sm text-gray-600 flex items-start gap-1.5">
+                      <span class="text-green-400 mt-0.5 shrink-0">•</span>
+                      {{ item }}
+                    </li>
+                  </ul>
+                </div>
+                <div v-if="aiSummary.sections.personalSummary.inProgressWork?.length" class="bg-amber-50 rounded-lg p-3">
+                  <p class="text-amber-700 text-xs font-medium mb-2">🔄 进行中</p>
+                  <ul class="space-y-1">
+                    <li v-for="(item, i) in aiSummary.sections.personalSummary.inProgressWork" :key="'wip-' + i"
+                      class="text-sm text-gray-600 flex items-start gap-1.5">
+                      <span class="text-amber-400 mt-0.5 shrink-0">•</span>
+                      {{ item }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div v-if="aiSummary.sections.personalSummary.workPatterns" class="mt-3 bg-gray-50 rounded-lg p-3">
+                <p class="text-xs text-gray-500 font-medium mb-1">📊 工作模式分析</p>
+                <p class="text-sm text-gray-600">{{ aiSummary.sections.personalSummary.workPatterns }}</p>
+              </div>
+            </section>
+
+            <!-- 2. 项目进展 -->
+            <section v-if="aiSummary.sections.projectProgress?.length">
+              <h4 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <span class="w-1 h-5 bg-purple-500 rounded-full"></span>
+                项目进展
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div v-for="(project, i) in aiSummary.sections.projectProgress" :key="'proj-' + i"
+                  class="border rounded-lg p-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <h5 class="font-medium text-gray-800 text-sm">{{ project.projectName }}</h5>
+                    <span :class="projectStatusClass(project.status)" class="text-xs px-2 py-0.5 rounded-full">
+                      {{ project.status }}
+                    </span>
+                  </div>
+                  <p class="text-sm text-gray-600 mb-2">{{ project.summary }}</p>
+                  <div v-if="project.achievements?.length" class="mb-1">
+                    <p v-for="(a, j) in project.achievements" :key="'pa-' + j" class="text-xs text-green-600 flex items-start gap-1">
+                      <span class="mt-0.5">✓</span> {{ a }}
+                    </p>
+                  </div>
+                  <div v-if="project.blockers?.length">
+                    <p v-for="(b, j) in project.blockers" :key="'pb-' + j" class="text-xs text-red-500 flex items-start gap-1">
+                      <span class="mt-0.5">!</span> {{ b }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- 3. 团队协作 -->
+            <section>
+              <h4 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <span class="w-1 h-5 bg-teal-500 rounded-full"></span>
+                团队协作
+              </h4>
+              <div class="bg-teal-50 rounded-lg p-4 space-y-2">
+                <p class="text-sm text-gray-700">{{ aiSummary.sections.teamCollaboration.collaborationOverview }}</p>
+                <p v-if="aiSummary.sections.teamCollaboration.crossProjectInsights" class="text-sm text-gray-600">
+                  {{ aiSummary.sections.teamCollaboration.crossProjectInsights }}
+                </p>
+              </div>
+            </section>
+
+            <!-- 4. 关键成果与待改进 -->
+            <section>
+              <h4 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <span class="w-1 h-5 bg-orange-500 rounded-full"></span>
+                关键成果与待改进
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="bg-green-50 border border-green-100 rounded-lg p-4">
+                  <p class="text-green-700 text-xs font-medium mb-2">🏆 关键成就</p>
+                  <ul class="space-y-1.5">
+                    <li v-for="(item, i) in aiSummary.sections.keyHighlights.achievements" :key="'ach-' + i"
+                      class="text-sm text-gray-600 flex items-start gap-1.5">
+                      <span class="text-green-400 mt-0.5 shrink-0">•</span>
+                      {{ item }}
+                    </li>
+                  </ul>
+                </div>
+                <div class="bg-amber-50 border border-amber-100 rounded-lg p-4">
+                  <p class="text-amber-700 text-xs font-medium mb-2">📈 待改进</p>
+                  <ul class="space-y-1.5">
+                    <li v-for="(item, i) in aiSummary.sections.keyHighlights.improvements" :key="'imp-' + i"
+                      class="text-sm text-gray-600 flex items-start gap-1.5">
+                      <span class="text-amber-400 mt-0.5 shrink-0">•</span>
+                      {{ item }}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <!-- 需要关注 -->
+              <div v-if="aiSummary.sections.keyHighlights.priorityAlerts?.length" class="mt-3 bg-red-50 border border-red-100 rounded-lg p-4">
+                <p class="text-red-700 text-xs font-medium mb-2">⚠️ 需要关注</p>
+                <ul class="space-y-1.5">
+                  <li v-for="(item, i) in aiSummary.sections.keyHighlights.priorityAlerts" :key="'alert-' + i"
+                    class="text-sm text-gray-600 flex items-start gap-1.5">
+                    <span class="text-red-400 mt-0.5 shrink-0">!</span>
+                    {{ item }}
+                  </li>
+                </ul>
+              </div>
+            </section>
+
+            <!-- 5. 下阶段建议 -->
+            <section v-if="aiSummary.sections.suggestions?.length">
+              <h4 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <span class="w-1 h-5 bg-indigo-500 rounded-full"></span>
+                下阶段建议
+              </h4>
+              <div class="space-y-2">
+                <div v-for="(s, i) in aiSummary.sections.suggestions" :key="'sug-' + i"
+                  class="flex items-start gap-3 bg-gray-50 rounded-lg p-3">
+                  <span :class="suggestionCategoryClass(s.category)"
+                    class="text-xs px-2 py-0.5 rounded-full shrink-0 mt-0.5 font-medium">
+                    {{ s.category }}
+                  </span>
+                  <div>
+                    <p class="text-sm text-gray-700">{{ s.suggestion }}</p>
+                    <p class="text-xs text-gray-400 mt-1">{{ s.reason }}</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </template>
+
+          <!-- 底部信息 -->
+          <div class="flex items-center justify-between text-xs text-gray-400 border-t border-gray-100 pt-4">
+            <span>由 AI 生成于 {{ formatTime(aiSummary.generatedAt) }}</span>
+            <button @click="copySummary" class="text-blue-500 hover:text-blue-600 transition-colors">
+              复制全文
+            </button>
+          </div>
+        </div>
+
+        <!-- 初始空状态 -->
+        <div v-else class="text-center py-12">
+          <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+          </svg>
+          <p class="text-gray-400 text-sm">选择总结类型和时间范围，点击"生成总结"获取 AI 智能分析</p>
         </div>
       </div>
     </template>
@@ -356,26 +358,13 @@
 </template>
 
 <script setup lang="ts">
-/**
- * 中集智历 - 总结归档页面
- */
-import { ref, computed, onMounted, watch, reactive } from 'vue'
-import {
-  ClipboardList,
-  CheckCircle,
-  Clock,
-  AlertTriangle,
-  TrendingUp,
-  BarChart3
-} from 'lucide-vue-next'
-import { getDashboard, getWorkStats } from '@/api/dashboard'
-import { downloadICS, downloadExcel, downloadPDF } from '@/api/export'
-import { useToast } from '@/composables/useToast'
-import { devLog } from '@/utils/logger'
+import { ref, computed, onMounted, watch } from 'vue'
+import { getWorkStats } from '@/api/dashboard'
+import { generateAISummary } from '@/api/aiSummary'
+import type { AISummaryResponse } from '@/api/aiSummary'
 
-const { toast } = useToast()
+// ==================== 时间范围 ====================
 
-// 时间范围选项
 const timeRanges = [
   { label: '本周', value: 'week' },
   { label: '本月', value: 'month' },
@@ -385,23 +374,22 @@ const timeRanges = [
 
 const selectedRange = ref('month')
 const loading = ref(false)
-const generating = ref(false)
-const summaryType = ref<'weekly' | 'monthly' | 'quarterly'>('weekly')
-const summary = ref<{ title: string; content: string } | null>(null)
+const error = ref('')
+const summaryType = ref<'weekly' | 'monthly' | 'quarterly' | 'yearly'>('weekly')
 
-// 导出状态
-const exporting = reactive({
-  ics: false,
-  excel: false,
-  pdf: false
-})
+// ==================== AI 总结状态 ====================
 
-// 统计数据
+const aiLoading = ref(false)
+const aiError = ref('')
+const aiSummary = ref<AISummaryResponse | null>(null)
+
+// ==================== 统计数据 ====================
+
 const stats = ref({
   total: 0,
   done: 0,
   inProgress: 0,
-  overdue: 0
+  todo: 0
 })
 
 const statusCounts = ref<Record<string, number>>({
@@ -413,40 +401,33 @@ const statusCounts = ref<Record<string, number>>({
 
 const projectStats = ref<Array<{ projectId: string; projectName: string; count: number }>>([])
 
-const trendData = ref<Array<{ label: string; count: number }>>([])
+// 状态列表配置
+const statusList = [
+  { status: 'TODO', label: '待办', color: 'bg-gray-400' },
+  { status: 'IN_PROGRESS', label: '进行中', color: 'bg-blue-500' },
+  { status: 'DONE', label: '已完成', color: 'bg-green-500' },
+  { status: 'CANCELLED', label: '已取消', color: 'bg-red-400' }
+]
 
-// 计算属性
+// ==================== 计算属性 ====================
+
 const completionRate = computed(() => {
   if (stats.value.total === 0) return 0
   return Math.round((stats.value.done / stats.value.total) * 100)
 })
 
-const maxTrendValue = computed(() => {
-  const max = Math.max(...trendData.value.map(d => d.count), 1)
-  return Math.ceil(max / 5) * 5
+const summaryTypeLabel = computed(() => {
+  const map: Record<string, string> = { weekly: '周', monthly: '月', quarterly: '季度', yearly: '年度' }
+  return map[summaryType.value] || ''
 })
 
-// 计算状态百分比
-function getStatusPercent(status: string): number {
+// ==================== 工具函数 ====================
+
+function getPercent(count: number): number {
   const total = stats.value.total || 1
-  const count = statusCounts.value[status] || 0
   return Math.round((count / total) * 100)
 }
 
-// 计算项目百分比
-function getProjectPercent(count: number): number {
-  const max = Math.max(...projectStats.value.map(p => p.count), 1)
-  return Math.round((count / max) * 100)
-}
-
-// 计算柱状图高度
-function getBarHeight(count: number): number {
-  if (count === 0) return 4
-  const max = maxTrendValue.value || 1
-  return Math.max(4, Math.round((count / max) * 140))
-}
-
-// 获取日期范围
 function getDateRange(): { startDate: string; endDate: string } {
   const now = new Date()
   const end = new Date(now)
@@ -454,16 +435,22 @@ function getDateRange(): { startDate: string; endDate: string } {
 
   switch (selectedRange.value) {
     case 'week':
-      start.setDate(now.getDate() - 7)
+      // 本周一
+      const day = now.getDay() || 7
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1)
       break
     case 'month':
-      start.setMonth(now.getMonth() - 1)
+      // 本月1号
+      start = new Date(now.getFullYear(), now.getMonth(), 1)
       break
     case 'quarter':
-      start.setMonth(now.getMonth() - 3)
+      // 本季度初
+      const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3
+      start = new Date(now.getFullYear(), quarterStartMonth, 1)
       break
     case 'year':
-      start.setFullYear(now.getFullYear() - 1)
+      // 自然年1月1日
+      start = new Date(now.getFullYear(), 0, 1)
       break
   }
 
@@ -473,227 +460,156 @@ function getDateRange(): { startDate: string; endDate: string } {
   }
 }
 
-// 加载数据
+function formatTime(isoStr: string): string {
+  const d = new Date(isoStr)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function projectStatusClass(status: string): string {
+  if (status.includes('良好')) return 'bg-green-100 text-green-700'
+  if (status.includes('关注')) return 'bg-amber-100 text-amber-700'
+  if (status.includes('停滞')) return 'bg-red-100 text-red-700'
+  return 'bg-gray-100 text-gray-700'
+}
+
+function suggestionCategoryClass(category: string): string {
+  const map: Record<string, string> = {
+    '效率': 'bg-blue-100 text-blue-700',
+    '优先级': 'bg-orange-100 text-orange-700',
+    '协作': 'bg-teal-100 text-teal-700',
+    '规划': 'bg-purple-100 text-purple-700'
+  }
+  return map[category] || 'bg-gray-100 text-gray-700'
+}
+
+// ==================== 数据加载 ====================
+
 async function loadData() {
   loading.value = true
+  error.value = ''
+
   try {
     const range = getDateRange()
+    const data = await getWorkStats({
+      startDate: range.startDate,
+      endDate: range.endDate
+    })
 
-    // 并行获取数据
-    const [dashboardData, workStatsData] = await Promise.all([
-      getDashboard(),
-      getWorkStats(range)
-    ])
-
-    if (!dashboardData || !workStatsData) {
-      throw new Error('Failed to load data')
+    if (data?.statusStats && Array.isArray(data.statusStats)) {
+      statusCounts.value = { TODO: 0, IN_PROGRESS: 0, DONE: 0, CANCELLED: 0 }
+      data.statusStats.forEach((item: any) => {
+        if (item.status in statusCounts.value) {
+          statusCounts.value[item.status] = item.count
+        }
+      })
     }
 
-    // 设置统计数据
-    stats.value = {
-      total: dashboardData.monthStats.total,
-      done: dashboardData.monthStats.done,
-      inProgress: 0,
-      overdue: dashboardData.overdueTasks.length
-    }
-
-    // 设置状态统计
-    const statusData = workStatsData.statusStats || []
-    statusCounts.value = {
-      TODO: statusData.find(s => s.status === 'TODO')?.count || 0,
-      IN_PROGRESS: statusData.find(s => s.status === 'IN_PROGRESS')?.count || 0,
-      DONE: statusData.find(s => s.status === 'DONE')?.count || 0,
-      CANCELLED: statusData.find(s => s.status === 'CANCELLED')?.count || 0
-    }
-
-    // 更新总数
     stats.value.total = Object.values(statusCounts.value).reduce((a, b) => a + b, 0)
+    stats.value.done = statusCounts.value.DONE
     stats.value.inProgress = statusCounts.value.IN_PROGRESS
-
-    // 设置项目统计
-    projectStats.value = workStatsData.projectStats || []
-
-    // 生成趋势数据（模拟最近7天）
-    generateTrendData()
-  } catch (error) {
-    devLog.error('加载数据失败:', error)
-    toast('加载数据失败', 'error')
+    stats.value.todo = statusCounts.value.TODO
+    projectStats.value = data?.projectStats || []
+  } catch (err: any) {
+    console.error('加载数据失败:', err)
+    error.value = err.message || '加载数据失败'
   } finally {
     loading.value = false
   }
 }
 
-// 生成趋势数据
-function generateTrendData() {
-  const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-  const today = new Date().getDay()
-  const startIndex = today === 0 ? 6 : today - 1
+// ==================== AI 总结生成 ====================
 
-  trendData.value = days.map((day) => {
-    // 模拟数据，实际应该从API获取
-    const count = Math.floor(Math.random() * (statusCounts.value.DONE / 7 || 3)) + 1
-    return {
-      label: day,
-      count
-    }
-  })
+async function handleGenerateSummary() {
+  if (aiLoading.value) return
 
-  // 调整顺序，让今天在最后
-  const sorted = []
-  for (let i = 0; i < 7; i++) {
-    sorted.push(trendData.value[(startIndex + i) % 7])
-  }
-  trendData.value = sorted
-}
+  aiLoading.value = true
+  aiError.value = ''
+  aiSummary.value = null
 
-// 生成工作总结
-async function generateSummary() {
-  generating.value = true
-  try {
-    // 模拟生成总结
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    const now = new Date()
-    let title = ''
-    let periodText = ''
-
-    switch (summaryType.value) {
-      case 'weekly':
-        title = `周总结 (${now.toLocaleDateString()})`
-        periodText = '本周'
-        break
-      case 'monthly':
-        title = `月总结 (${now.getFullYear()}年${now.getMonth() + 1}月)`
-        periodText = '本月'
-        break
-      case 'quarterly':
-        const quarter = Math.floor(now.getMonth() / 3) + 1
-        title = `季度总结 (${now.getFullYear()}年第${quarter}季度)`
-        periodText = '本季度'
-        break
-    }
-
-    const content = `【工作概述】
-在${periodText}的工作中，共完成了 ${stats.value.done} 项任务，目前有 ${stats.value.inProgress} 项任务正在进行中。
-
-【完成情况】
-- 待办任务：${statusCounts.value.TODO} 项
-- 进行中：${statusCounts.value.IN_PROGRESS} 项
-- 已完成：${statusCounts.value.DONE} 项
-- 完成率：${Math.round((stats.value.done / stats.value.total) * 100) || 0}%
-
-【项目参与】
-${projectStats.value.slice(0, 3).map(p => `- ${p.projectName}：${p.count} 项任务`).join('\n')}
-
-【需要关注】
-- 逾期任务：${stats.value.overdue} 项
-
-【下一步计划】
-1. 优先处理逾期任务
-2. 推进进行中的任务
-3. 按计划完成待办任务
-`
-    summary.value = { title, content }
-    toast('总结生成成功', 'success')
-  } catch (error) {
-    devLog.error('生成总结失败:', error)
-    toast('生成总结失败', 'error')
-  } finally {
-    generating.value = false
-  }
-}
-
-// 复制总结
-async function copySummary() {
-  if (!summary.value) return
-
-  try {
-    await navigator.clipboard.writeText(summary.value.content)
-    toast('已复制到剪贴板', 'success')
-  } catch (error) {
-    devLog.error('复制失败:', error)
-    toast('复制失败', 'error')
-  }
-}
-
-// 下载当前总结
-function downloadCurrentSummary() {
-  if (!summary.value) return
-
-  const blob = new Blob([summary.value.content], { type: 'text/plain;charset=utf-8' })
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `${summary.value.title.replace(/[\/\s]/g, '-')}.txt`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  window.URL.revokeObjectURL(url)
-
-  toast('总结已下载', 'success')
-}
-
-// 导出ICS日历
-async function handleExportICS() {
-  exporting.ics = true
   try {
     const range = getDateRange()
-    await downloadICS(range)
-    toast('ICS日历导出成功', 'success')
-  } catch (error) {
-    devLog.error('导出ICS失败:', error)
-    toast('导出ICS失败', 'error')
-  } finally {
-    exporting.ics = false
-  }
-}
-
-// 导出Excel
-async function handleExportExcel() {
-  exporting.excel = true
-  try {
-    const range = getDateRange()
-    await downloadExcel(range)
-    toast('Excel导出成功', 'success')
-  } catch (error) {
-    devLog.error('导出Excel失败:', error)
-    toast('导出Excel失败', 'error')
-  } finally {
-    exporting.excel = false
-  }
-}
-
-// 导出PDF总结
-async function handleExportPDF() {
-  exporting.pdf = true
-  try {
-    const range = getDateRange()
-    await downloadPDF({
-      ...range,
-      summaryType: summaryType.value
+    const data = await generateAISummary({
+      type: summaryType.value,
+      startDate: range.startDate,
+      endDate: range.endDate
     })
-    toast('PDF总结导出成功', 'success')
-  } catch (error) {
-    devLog.error('导出PDF失败:', error)
-    toast('导出PDF失败', 'error')
+    aiSummary.value = data
+  } catch (err: any) {
+    const msg = err.response?.data?.message
+    if (err.response?.status === 429) {
+      aiError.value = 'AI总结请求过于频繁，请1分钟后再试'
+    } else if (err.response?.status === 503) {
+      aiError.value = 'AI总结服务暂未启用，请联系管理员'
+    } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+      aiError.value = 'AI总结生成超时，请稍后重试'
+    } else {
+      aiError.value = msg || 'AI总结生成失败，请稍后重试'
+    }
   } finally {
-    exporting.pdf = false
+    aiLoading.value = false
   }
 }
 
-// 监听时间范围变化
+// ==================== 复制 ====================
+
+async function copySummary() {
+  if (!aiSummary.value) return
+
+  let text = aiSummary.value.title + '\n\n'
+
+  if (aiSummary.value.basicContent) {
+    text += aiSummary.value.basicContent
+  } else if (aiSummary.value.sections) {
+    const s = aiSummary.value.sections
+    text += '【个人工作总结】\n' + s.personalSummary.overview + '\n\n'
+    if (s.personalSummary.completedWork?.length) {
+      text += '已完成：\n' + s.personalSummary.completedWork.map(w => '  - ' + w).join('\n') + '\n\n'
+    }
+    if (s.personalSummary.inProgressWork?.length) {
+      text += '进行中：\n' + s.personalSummary.inProgressWork.map(w => '  - ' + w).join('\n') + '\n\n'
+    }
+    if (s.personalSummary.workPatterns) {
+      text += '工作模式：' + s.personalSummary.workPatterns + '\n\n'
+    }
+    if (s.projectProgress?.length) {
+      text += '【项目进展】\n'
+      s.projectProgress.forEach(p => {
+        text += `${p.projectName} (${p.status}): ${p.summary}\n`
+      })
+      text += '\n'
+    }
+    text += '【团队协作】\n' + s.teamCollaboration.collaborationOverview + '\n\n'
+    if (s.keyHighlights.achievements?.length) {
+      text += '【关键成就】\n' + s.keyHighlights.achievements.map(a => '  - ' + a).join('\n') + '\n\n'
+    }
+    if (s.keyHighlights.improvements?.length) {
+      text += '【待改进】\n' + s.keyHighlights.improvements.map(a => '  - ' + a).join('\n') + '\n\n'
+    }
+    if (s.suggestions?.length) {
+      text += '【建议】\n'
+      s.suggestions.forEach(sg => {
+        text += `  [${sg.category}] ${sg.suggestion} — ${sg.reason}\n`
+      })
+    }
+  }
+
+  try {
+    await navigator.clipboard.writeText(text)
+    alert('已复制到剪贴板')
+  } catch {
+    alert('复制失败')
+  }
+}
+
+// ==================== 生命周期 ====================
+
 watch(selectedRange, () => {
   loadData()
+  // 切换时间范围时清除旧的AI总结
+  aiSummary.value = null
 })
 
 onMounted(() => {
   loadData()
 })
 </script>
-
-<style scoped>
-.reports-page {
-  max-width: 1200px;
-  margin: 0 auto;
-}
-</style>

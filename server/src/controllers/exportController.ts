@@ -29,11 +29,13 @@ function escapeICSText(text: string): string {
  */
 function getICSPriority(priority: string): number {
   switch (priority) {
-    case 'HIGH':
+    case 'IMPORTANT_URGENT':
       return 1
-    case 'MEDIUM':
+    case 'URGENT_NOT_IMPORTANT':
+      return 3
+    case 'IMPORTANT_NOT_URGENT':
       return 5
-    case 'LOW':
+    case 'NOT_IMPORTANT_NOT_URGENT':
       return 9
     default:
       return 5
@@ -247,11 +249,12 @@ export async function exportExcel(req: AuthRequest, res: Response) {
       'CANCELLED': '已取消'
     }
 
-    // 优先级映射
+    // 优先级映射（四象限）
     const priorityMap: Record<string, string> = {
-      'HIGH': '高',
-      'MEDIUM': '中',
-      'LOW': '低'
+      'IMPORTANT_URGENT': '重要且紧急',
+      'IMPORTANT_NOT_URGENT': '重要不紧急',
+      'URGENT_NOT_IMPORTANT': '紧急不重要',
+      'NOT_IMPORTANT_NOT_URGENT': '不重要不紧急'
     }
 
     // 生成CSV内容（简化版，不依赖exceljs）

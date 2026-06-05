@@ -2,20 +2,43 @@
  * 中集智历 - 任务类型定义
  */
 
-// 任务优先级
-export type Priority = 'HIGH' | 'MEDIUM' | 'LOW'
+// 任务优先级（四象限）
+export type Priority = 'IMPORTANT_URGENT' | 'IMPORTANT_NOT_URGENT' | 'URGENT_NOT_IMPORTANT' | 'NOT_IMPORTANT_NOT_URGENT'
 
 // 任务状态
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED'
 
 // 提醒类型
-export type Reminder = 'FIFTEEN_MIN' | 'ONE_HOUR' | 'ONE_DAY' | 'THREE_DAYS'
+export type Reminder = 'TWO_WEEKS' | 'ONE_WEEK' | 'THREE_DAYS' | 'ONE_DAY'
 
 // 重复类型
 export type Repeat = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'
 
-// 任务可见性
+// 任务可见性（固定为公开）
 export type TaskVisibility = 'PUBLIC' | 'PRIVATE'
+
+// 优先级显示映射
+export const PRIORITY_MAP: Record<Priority, { label: string; color: string; bgColor: string }> = {
+  IMPORTANT_URGENT: { label: '重要且紧急', color: 'text-red-700', bgColor: 'bg-red-100' },
+  IMPORTANT_NOT_URGENT: { label: '重要不紧急', color: 'text-blue-700', bgColor: 'bg-blue-100' },
+  URGENT_NOT_IMPORTANT: { label: '紧急不重要', color: 'text-orange-700', bgColor: 'bg-orange-100' },
+  NOT_IMPORTANT_NOT_URGENT: { label: '不重要不紧急', color: 'text-gray-600', bgColor: 'bg-gray-100' },
+}
+
+// 提醒时间显示映射
+export const REMINDER_MAP: Record<Reminder, string> = {
+  TWO_WEEKS: '提前两周',
+  ONE_WEEK: '提前一周',
+  THREE_DAYS: '提前三天',
+  ONE_DAY: '提前一天',
+}
+
+// 固定标签选项
+export const FIXED_TAGS = ['常规工作', '改善工作', '创新工作'] as const
+export type FixedTag = typeof FIXED_TAGS[number]
+
+// 固定交付成果选项
+export const DELIVERABLE_OPTIONS = ['活动新闻', '活动方案'] as const
 
 // 任务基础信息
 export interface Task {
@@ -29,8 +52,11 @@ export interface Task {
   assigneeId: string
   priority: Priority
   status: TaskStatus
-  visibility: TaskVisibility  // 新增：任务可见性
+  visibility: TaskVisibility
   deliverable: string | null
+  completedAt: string | null
+  completedBy: string | null
+  completionNote: string | null
   tags: string[] | null
   reminder: Reminder | null
   repeat: Repeat | null
@@ -44,6 +70,7 @@ export interface Task {
   project?: {
     id: string
     name: string
+    category?: string | null
   }
   category?: TaskCategory
   assignee?: {
@@ -62,6 +89,7 @@ export interface Task {
   collaborators?: TaskCollaborator[]
   comments?: Comment[]
   attachments?: Attachment[]
+  evaluations?: Evaluation[]
 }
 
 // 任务类别
@@ -116,6 +144,32 @@ export interface Attachment {
   createdAt: string
 }
 
+// 评价
+export interface Evaluation {
+  id: string
+  taskId: string
+  evaluatorId: string
+  targetUserId: string
+  projectId: string
+  rating: number
+  comment: string | null
+  createdAt: string
+  updatedAt: string
+  evaluator?: {
+    id: string
+    nickname: string
+  }
+  targetUser?: {
+    id: string
+    nickname: string
+    avatar: string | null
+  }
+  task?: {
+    id: string
+    title: string
+  }
+}
+
 // 创建任务请求
 export interface CreateTaskRequest {
   projectId: string
@@ -126,7 +180,7 @@ export interface CreateTaskRequest {
   categoryId?: string
   assigneeId: string
   priority?: Priority
-  visibility?: TaskVisibility  // 新增
+  visibility?: TaskVisibility
   deliverable?: string
   tags?: string[]
   reminder?: Reminder
@@ -144,8 +198,9 @@ export interface UpdateTaskRequest {
   assigneeId?: string
   priority?: Priority
   status?: TaskStatus
-  visibility?: TaskVisibility  // 新增
+  visibility?: TaskVisibility
   deliverable?: string
+  completionNote?: string
   tags?: string[]
   reminder?: Reminder
   repeat?: Repeat

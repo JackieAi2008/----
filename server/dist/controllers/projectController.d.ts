@@ -74,4 +74,12 @@ export declare function permanentDeleteProject(req: Request, res: Response): Pro
  * 移交项目负责人
  */
 export declare function transferProject(req: Request, res: Response): Promise<void>;
+/**
+ * 归档项目
+ */
+export declare function archiveProject(req: Request, res: Response): Promise<void>;
+/**
+ * 取消归档项目
+ */
+export declare function unarchiveProject(req: Request, res: Response): Promise<void>;
 //# sourceMappingURL=projectController.d.ts.map

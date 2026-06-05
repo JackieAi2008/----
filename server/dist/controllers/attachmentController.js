@@ -1,7 +1,6 @@
 import path from 'path';
 import fs from 'fs';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import prisma from '../config/database.js';
 // 附件存储目录
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'attachments');
 // 确保上传目录存在

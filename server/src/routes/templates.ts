@@ -12,14 +12,14 @@ const router = Router()
 // 创建模板验证规则
 const createTemplateValidation = [
   body('title').notEmpty().withMessage('请输入模板标题'),
-  body('priority').optional().isIn(['HIGH', 'MEDIUM', 'LOW']).withMessage('无效的优先级'),
+  body('priority').optional().isIn(['IMPORTANT_URGENT', 'IMPORTANT_NOT_URGENT', 'URGENT_NOT_IMPORTANT', 'NOT_IMPORTANT_NOT_URGENT']).withMessage('无效的优先级'),
   validate
 ]
 
 // 更新模板验证规则
 const updateTemplateValidation = [
   body('title').optional().notEmpty().withMessage('模板标题不能为空'),
-  body('priority').optional().isIn(['HIGH', 'MEDIUM', 'LOW']).withMessage('无效的优先级'),
+  body('priority').optional().isIn(['IMPORTANT_URGENT', 'IMPORTANT_NOT_URGENT', 'URGENT_NOT_IMPORTANT', 'NOT_IMPORTANT_NOT_URGENT']).withMessage('无效的优先级'),
   validate
 ]
 

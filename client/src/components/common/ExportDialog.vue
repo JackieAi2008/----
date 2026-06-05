@@ -60,6 +60,7 @@
             <option value="weekly">周报</option>
             <option value="monthly">月报</option>
             <option value="quarterly">季报</option>
+            <option value="yearly">年报</option>
           </select>
         </div>
 
@@ -169,7 +170,7 @@ const formats = [
 const selectedFormat = ref('ics')
 const startDate = ref('')
 const endDate = ref('')
-const summaryType = ref<'weekly' | 'monthly' | 'quarterly'>('weekly')
+const summaryType = ref<'weekly' | 'monthly' | 'quarterly' | 'yearly'>('weekly')
 const selectedProject = ref('')
 const selectedStatus = ref('')
 const exporting = ref(false)

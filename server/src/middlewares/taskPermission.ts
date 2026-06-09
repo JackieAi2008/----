@@ -149,8 +149,8 @@ export async function getTaskPermissions(
     }
   }
 
-  // 编辑和删除：项目负责人、任务创建者或任务负责人
-  const canEdit = isProjectOwner || isCreator || isAssignee
+  // 编辑：项目成员均可编辑（协作场景）；删除：项目负责人、任务创建者或任务负责人
+  const canEdit = isProjectMember
   const canDelete = isProjectOwner || isCreator || isAssignee
 
   // 修改负责人和截止时间：项目负责人、任务创建者或任务负责人
@@ -210,6 +210,9 @@ export function requireTaskPermission(action: TaskAction) {
         break
 
       case TaskAction.EDIT:
+        // 项目成员均可编辑任务内容（协作场景，与"项目成员可创建任务"保持一致）
+        hasPermission = isProjectMember
+        break
       case TaskAction.DELETE:
       case TaskAction.CHANGE_ASSIGNEE:
       case TaskAction.CHANGE_DUE_DATE:

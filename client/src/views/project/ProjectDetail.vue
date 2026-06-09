@@ -14,12 +14,6 @@
             <p v-if="project.description" class="text-sm sm:text-base text-gray-500 mt-2">{{ project.description }}</p>
             <div class="flex items-center gap-4 mt-4">
               <span
-                v-if="project.category"
-                class="px-2 py-1 rounded-full text-xs bg-indigo-100 text-indigo-700"
-              >
-                {{ PROJECT_CATEGORY_MAP[project.category] || '未分类' }}
-              </span>
-              <span
                 class="px-2 py-1 rounded-full text-xs"
                 :class="project.visibility === 'PUBLIC' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'"
               >
@@ -195,15 +189,6 @@
               <select v-model="editForm.visibility" class="input w-full">
                 <option value="PUBLIC">公开</option>
                 <option value="PRIVATE">私密</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                项目分类 <span class="text-red-500">*</span>
-              </label>
-              <select v-model="editForm.category" class="input w-full" required>
-                <option value="" disabled>请选择分类</option>
-                <option v-for="cat in categoryOptions" :key="cat.value" :value="cat.value">{{ cat.label }}</option>
               </select>
             </div>
           </div>
@@ -386,8 +371,6 @@ import { getProjectMembers, updateProject, transferProject, addProjectMember, re
 import { getTasks, deleteTask } from '@/api/task'
 import { getDepartmentMembers } from '@/api/user'
 import { formatDate, formatDateTime } from '@/utils/date'
-import { PROJECT_CATEGORY_MAP, PROJECT_CATEGORY_OPTIONS } from '@/types/project'
-import type { ProjectCategory } from '@/types/project'
 import TaskForm from '@/components/task/TaskForm.vue'
 import type { Task, TaskStatus } from '@/types/task'
 import type { ProjectMember } from '@/types/project'
@@ -417,8 +400,7 @@ const deptMembers = ref<UserType[]>([])
 const editForm = reactive({
   name: '',
   description: '',
-  visibility: 'PUBLIC' as 'PUBLIC' | 'PRIVATE',
-  category: '' as ProjectCategory | ''
+  visibility: 'PUBLIC' as 'PUBLIC' | 'PRIVATE'
 })
 
 const transferForm = reactive({
@@ -427,7 +409,6 @@ const transferForm = reactive({
 
 const projectId = computed(() => route.params.id as string)
 const project = computed(() => projectStore.currentProject)
-const categoryOptions = PROJECT_CATEGORY_OPTIONS
 
 // 当前成员 ID 集合（用于判断是否已加入）
 const memberIds = computed(() => new Set(members.value.map(m => m.userId)))
@@ -485,7 +466,6 @@ function openEditDialog() {
     editForm.name = project.value.name
     editForm.description = project.value.description || ''
     editForm.visibility = project.value.visibility as 'PUBLIC' | 'PRIVATE'
-    editForm.category = project.value.category || ''
   }
   showEditProject.value = true
 }
@@ -496,8 +476,7 @@ async function handleEditProject() {
     await updateProject(projectId.value, {
       name: editForm.name,
       description: editForm.description,
-      visibility: editForm.visibility,
-      category: editForm.category || undefined
+      visibility: editForm.visibility
     })
     await projectStore.fetchProject(projectId.value)
     showEditProject.value = false

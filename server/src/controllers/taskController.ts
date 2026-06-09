@@ -1304,3 +1304,57 @@ export async function getTaskActivity(req: Request, res: Response) {
     data: allItems
   })
 }
+
+/**
+ * 获取交付成果选项列表
+ */
+export async function getDeliverableOptions(_req: Request, res: Response) {
+  const options = await prisma.deliverableOption.findMany({
+    orderBy: { createdAt: 'asc' }
+  })
+
+  res.json({
+    success: true,
+    data: options
+  })
+}
+
+/**
+ * 新增交付成果选项（管理员）
+ */
+export async function createDeliverableOption(req: Request, res: Response) {
+  const { name } = req.body
+  if (!name || !name.trim()) {
+    throw new ApiError(400, '请输入选项名称')
+  }
+
+  const existing = await prisma.deliverableOption.findFirst({
+    where: { name: name.trim() }
+  })
+  if (existing) {
+    throw new ApiError(409, '该选项已存在')
+  }
+
+  const option = await prisma.deliverableOption.create({
+    data: { name: name.trim() }
+  })
+
+  res.status(201).json({
+    success: true,
+    data: option
+  })
+}
+
+/**
+ * 删除交付成果选项（管理员）
+ */
+export async function deleteDeliverableOption(req: Request, res: Response) {
+  const { id } = req.params
+
+  await prisma.deliverableOption.delete({ where: { id } })
+
+  res.json({
+    success: true,
+    message: '删除成功'
+  })
+}

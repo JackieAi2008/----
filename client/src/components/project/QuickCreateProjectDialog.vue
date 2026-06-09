@@ -37,19 +37,6 @@
           ></textarea>
         </div>
 
-        <!-- 项目分类 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
-            项目分类 <span class="text-red-500">*</span>
-          </label>
-          <select v-model="form.category" class="input w-full">
-            <option value="">请选择分类</option>
-            <option v-for="cat in projectCategories" :key="cat.value" :value="cat.value">
-              {{ cat.label }}
-            </option>
-          </select>
-        </div>
-
         <!-- 可见性 -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">可见性</label>
@@ -165,9 +152,7 @@ import { searchUsers } from '@/api/user'
 import { useProjectStore } from '@/stores/project'
 import { useToast } from '@/composables/useToast'
 import type { User } from '@/types/user'
-import type { Visibility, ProjectCategory } from '@/types/project'
-import { PROJECT_CATEGORY_OPTIONS } from '@/types/project'
-
+import type { Visibility } from '@/types/project'
 const emit = defineEmits<{
   close: []
   saved: [project: { id: string; name: string }]
@@ -176,15 +161,11 @@ const emit = defineEmits<{
 const toast = useToast()
 const projectStore = useProjectStore()
 
-// 项目分类选项
-const projectCategories = PROJECT_CATEGORY_OPTIONS
-
 // 表单数据
 const form = ref({
   name: '',
   description: '',
-  visibility: 'PUBLIC' as Visibility,
-  category: '' as ProjectCategory | ''
+  visibility: 'PUBLIC' as Visibility
 })
 
 // 状态
@@ -244,11 +225,6 @@ async function handleCreate() {
     return
   }
 
-  if (!form.value.category) {
-    toast.error('请选择项目分类')
-    return
-  }
-
   submitting.value = true
 
   try {
@@ -256,8 +232,7 @@ async function handleCreate() {
     const project = await createProject({
       name: form.value.name.trim(),
       description: form.value.description.trim() || undefined,
-      visibility: form.value.visibility,
-      category: form.value.category as ProjectCategory
+      visibility: form.value.visibility
     })
 
     // 添加成员

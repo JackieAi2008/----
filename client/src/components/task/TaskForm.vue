@@ -43,30 +43,13 @@
           <div class="flex gap-2">
             <select v-model="form.projectId" class="input flex-1" required @change="handleProjectChange">
               <option value="">请选择项目</option>
-              <!-- 按5个固定分类分组 -->
-              <optgroup
-                v-for="cat in projectCategories"
-                :key="cat.value"
-                :label="cat.label"
+              <option
+                v-for="project in projects"
+                :key="project.id"
+                :value="project.id"
               >
-                <option
-                  v-for="project in getProjectsByCategory(cat.value)"
-                  :key="project.id"
-                  :value="project.id"
-                >
-                  {{ project.name }}
-                </option>
-              </optgroup>
-              <!-- 未分类项目 -->
-              <optgroup v-if="uncategorizedProjects.length > 0" label="其他项目">
-                <option
-                  v-for="project in uncategorizedProjects"
-                  :key="project.id"
-                  :value="project.id"
-                >
-                  {{ project.name }}
-                </option>
-              </optgroup>
+                {{ project.name }}
+              </option>
             </select>
             <button
               type="button"
@@ -120,7 +103,12 @@
           </label>
           <select v-model="form.assigneeId" class="input" required>
             <option value="">请选择负责人</option>
-            <optgroup label="项目成员">
+            <optgroup v-if="departmentMembers.length > 0" label="本部门成员">
+              <option v-for="user in departmentMembers" :key="user.id" :value="user.id">
+                {{ user.nickname }}
+              </option>
+            </optgroup>
+            <optgroup v-if="members.length > 0" label="项目成员">
               <option v-for="member in members" :key="member.userId" :value="member.userId">
                 {{ member.user?.nickname || '未知用户' }}
               </option>
@@ -163,29 +151,14 @@
           </div>
         </div>
 
-        <!-- 类别和优先级 -->
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">任务类别</label>
-            <select v-model="form.categoryId" class="input">
-              <option value="">无类别</option>
-              <option
-                v-for="category in categories"
-                :key="category.id"
-                :value="category.id"
-              >
-                {{ category.name }}
-              </option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">优先级</label>
-            <select v-model="form.priority" class="input">
-              <option v-for="(info, key) in priorityMap" :key="key" :value="key">
-                {{ info.label }}
-              </option>
-            </select>
-          </div>
+        <!-- 优先级 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">优先级</label>
+          <select v-model="form.priority" class="input">
+            <option v-for="(info, key) in priorityMap" :key="key" :value="key">
+              {{ info.label }}
+            </option>
+          </select>
         </div>
 
         <!-- 可见性：固定为公开，隐藏选择器 -->
@@ -214,15 +187,74 @@
           </div>
         </div>
 
-        <!-- 交付成果：下拉选择 -->
+        <!-- 交付成果：下拉选择 + 自定义输入 -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">交付成果</label>
-          <select v-model="form.deliverable" class="input">
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-sm font-medium text-gray-700">交付成果</label>
+            <button
+              v-if="authStore.isAdmin"
+              type="button"
+              @click="showDeliverableManager = !showDeliverableManager"
+              class="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              <Plus class="w-3 h-3" />
+              管理选项
+            </button>
+          </div>
+
+          <!-- 管理面板（仅管理员） -->
+          <div v-if="showDeliverableManager && authStore.isAdmin" class="mb-2 p-3 bg-gray-50 rounded-lg space-y-2">
+            <div class="flex gap-2">
+              <input
+                v-model="newDeliverableName"
+                type="text"
+                class="input flex-1 text-sm"
+                placeholder="输入新选项名称"
+                @keyup.enter="handleAddDeliverable"
+              />
+              <button
+                type="button"
+                @click="handleAddDeliverable"
+                :disabled="!newDeliverableName.trim() || managingDeliverable"
+                class="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {{ managingDeliverable ? '...' : '添加' }}
+              </button>
+            </div>
+            <div class="space-y-1">
+              <div
+                v-for="opt in serverDeliverableOptions"
+                :key="opt.id"
+                class="flex items-center justify-between px-2 py-1.5 bg-white rounded border border-gray-100"
+              >
+                <span class="text-sm">{{ opt.name }}</span>
+                <button
+                  type="button"
+                  @click="handleDeleteDeliverable(opt.id)"
+                  class="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                  title="删除此选项"
+                >
+                  <Trash2 class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <select v-model="form.deliverable" class="input" @change="handleDeliverableChange">
             <option value="">请选择交付成果</option>
-            <option v-for="opt in deliverableOptions" :key="opt" :value="opt">
+            <option v-for="opt in allDeliverableOptions" :key="opt" :value="opt">
               {{ opt }}
             </option>
+            <option value="__custom__">✏️ 自定义...</option>
           </select>
+          <input
+            v-if="form.deliverable === '__custom__' || showCustomDeliverable"
+            v-model="customDeliverableText"
+            type="text"
+            class="input mt-2"
+            placeholder="请输入自定义交付成果"
+            @input="form.deliverable = customDeliverableText"
+          />
         </div>
 
         <!-- 标签：固定三选 -->
@@ -308,11 +340,11 @@
  * - 需求8：标签固定为三种
  */
 import { ref, reactive, computed, watch, onMounted } from 'vue'
-import { X, FileText, Plus } from 'lucide-vue-next'
+import { X, FileText, Plus, Trash2 } from 'lucide-vue-next'
 import { useProjectStore } from '@/stores/project'
 import { useAuthStore } from '@/stores/auth'
 import { getProjectMembers } from '@/api/project'
-import { getTaskCategories, createTask, updateTask, getTask, getAllTags } from '@/api/task'
+import { createTask, updateTask, getTask, getAllTags, getDeliverableOptions, createDeliverableOption, deleteDeliverableOption } from '@/api/task'
 import { createTemplate } from '@/api/template'
 import { searchUsers } from '@/api/user'
 import { formatDateTime } from '@/utils/date'
@@ -323,15 +355,15 @@ import QuickCreateProjectDialog from '@/components/project/QuickCreateProjectDia
 import {
   PRIORITY_MAP,
   FIXED_TAGS,
-  DELIVERABLE_OPTIONS,
   type Priority,
   type Reminder,
   type Repeat,
   type TaskTemplate,
 } from '@/types/task'
-import { PROJECT_CATEGORY_OPTIONS, type ProjectCategory } from '@/types/project'
+import type { DeliverableOption } from '@/api/task'
 import type { ProjectMember } from '@/types/project'
 import type { User } from '@/types/user'
+import { getDepartmentMembers } from '@/api/user'
 
 const props = defineProps<{
   date?: Date | null
@@ -349,19 +381,70 @@ const authStore = useAuthStore()
 // 常量导出到模板
 const priorityMap = PRIORITY_MAP
 const fixedTags = FIXED_TAGS
-const deliverableOptions = DELIVERABLE_OPTIONS
-const projectCategories = PROJECT_CATEGORY_OPTIONS
+// 交付成果选项：从 API 获取
+const serverDeliverableOptions = ref<DeliverableOption[]>([])
+const allDeliverableOptions = computed(() => serverDeliverableOptions.value.map(o => o.name))
+
+// 交付成果管理（管理员）
+const showDeliverableManager = ref(false)
+const newDeliverableName = ref('')
+const managingDeliverable = ref(false)
+
+async function fetchDeliverableOptions() {
+  try {
+    serverDeliverableOptions.value = await getDeliverableOptions()
+  } catch {
+    // 静默忽略
+  }
+}
+
+async function handleAddDeliverable() {
+  const name = newDeliverableName.value.trim()
+  if (!name) return
+  managingDeliverable.value = true
+  try {
+    const option = await createDeliverableOption(name)
+    serverDeliverableOptions.value.push(option)
+    newDeliverableName.value = ''
+  } catch (e: any) {
+    alert(e?.response?.data?.message || '添加失败')
+  } finally {
+    managingDeliverable.value = false
+  }
+}
+
+async function handleDeleteDeliverable(id: string) {
+  if (!confirm('确定删除此交付成果选项？')) return
+  try {
+    await deleteDeliverableOption(id)
+    serverDeliverableOptions.value = serverDeliverableOptions.value.filter(o => o.id !== id)
+  } catch {
+    alert('删除失败')
+  }
+}
+
+function handleDeliverableChange() {
+  if (form.deliverable === '__custom__') {
+    showCustomDeliverable.value = true
+    customDeliverableText.value = ''
+    form.deliverable = ''
+  } else {
+    showCustomDeliverable.value = false
+  }
+}
 
 // 状态
 const submitting = ref(false)
 const savingTemplate = ref(false)
 const members = ref<ProjectMember[]>([])
-const categories = ref<{ id: string; name: string; color: string; isSystem: boolean }[]>([])
 const availableTags = ref<string[]>([])
 const showTemplateDialog = ref(false)
 const showQuickCreateProject = ref(false)
 const assigneeSearchKeyword = ref('')
 const assigneeSearchResults = ref<User[]>([])
+const departmentMembers = ref<User[]>([])
+const showCustomDeliverable = ref(false)
+const customDeliverableText = ref('')
 let searchTimeout: number | null = null
 
 // 表单数据
@@ -372,7 +455,6 @@ const form = reactive({
   startDate: '',
   dueDate: '',
   assigneeId: '',
-  categoryId: '',
   priority: 'IMPORTANT_URGENT' as Priority,
   visibility: 'PUBLIC' as 'PUBLIC' | 'PRIVATE',  // 固定公开
   reminder: '',
@@ -389,18 +471,6 @@ const canSearchCrossDept = computed(() => {
   return authStore.isAdmin || currentProject?.ownerId === authStore.user?.id
 })
 
-// 按分类分组项目
-function getProjectsByCategory(category: ProjectCategory) {
-  return projects.value.filter(p => (p as any).category === category)
-}
-
-const uncategorizedProjects = computed(() => {
-  const categorizedIds = new Set(
-    PROJECT_CATEGORY_OPTIONS.flatMap(cat => getProjectsByCategory(cat.value).map(p => p.id))
-  )
-  return projects.value.filter(p => !categorizedIds.has(p.id))
-})
-
 // 初始化日期（新建任务时默认为点击当天）
 watch(() => props.date, (newDate) => {
   if (newDate && !props.taskId) {
@@ -414,19 +484,16 @@ watch(() => props.date, (newDate) => {
 async function handleProjectChange() {
   if (!form.projectId) {
     members.value = []
-    categories.value = []
     availableTags.value = []
     return
   }
 
   try {
-    const [membersRes, categoriesRes, tagsRes] = await Promise.all([
+    const [membersRes, tagsRes] = await Promise.all([
       getProjectMembers(form.projectId),
-      getTaskCategories(form.projectId),
       getAllTags(form.projectId)
     ])
     members.value = membersRes
-    categories.value = categoriesRes
     availableTags.value = tagsRes
 
     // 默认选择当前用户作为负责人
@@ -479,12 +546,17 @@ async function loadTask() {
     form.startDate = task.startDate ? formatDateTime(task.startDate, 'YYYY-MM-DDTHH:mm') : ''
     form.dueDate = formatDateTime(task.dueDate, 'YYYY-MM-DDTHH:mm')
     form.assigneeId = task.assigneeId
-    form.categoryId = task.categoryId || ''
     form.priority = task.priority
     form.reminder = task.reminder || ''
     form.repeat = task.repeat || ''
     form.deliverable = task.deliverable || ''
     form.tags = task.tags || []
+
+    // 如果交付成果不在预设选项中，显示自定义输入
+    if (form.deliverable && !allDeliverableOptions.value.includes(form.deliverable) && form.deliverable !== '__custom__') {
+      showCustomDeliverable.value = true
+      customDeliverableText.value = form.deliverable
+    }
 
     // 加载项目成员
     await handleProjectChange()
@@ -505,7 +577,6 @@ async function handleSubmit() {
       startDate: form.startDate || undefined,
       dueDate: form.dueDate,
       assigneeId: form.assigneeId,
-      categoryId: form.categoryId || undefined,
       priority: form.priority,
       visibility: 'PUBLIC' as const,  // 固定公开
       reminder: (form.reminder || undefined) as Reminder | undefined,
@@ -549,10 +620,6 @@ function applyTemplate(template: TaskTemplate) {
   form.title = template.title
   form.description = template.description || ''
   form.priority = template.priority
-
-  if (template.categoryId) {
-    form.categoryId = template.categoryId
-  }
 }
 
 // 处理快速创建项目成功
@@ -575,7 +642,6 @@ async function handleSaveAsTemplate() {
       title: form.title,
       description: form.description || undefined,
       priority: form.priority,
-      categoryId: form.categoryId || undefined,
       defaultAssignee: form.assigneeId || undefined
     })
     alert('模板保存成功')
@@ -590,6 +656,17 @@ async function handleSaveAsTemplate() {
 // 初始化
 onMounted(async () => {
   await projectStore.fetchProjects()
+
+  // 获取交付成果选项
+  await fetchDeliverableOptions()
+
+  // 获取本部门成员
+  try {
+    const res = await getDepartmentMembers()
+    departmentMembers.value = res.members || []
+  } catch {
+    // 非部门成员或无部门，静默忽略
+  }
 
   if (isEdit.value) {
     await loadTask()

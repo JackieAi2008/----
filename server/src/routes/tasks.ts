@@ -4,7 +4,7 @@
 import { Router } from 'express'
 import { body } from 'express-validator'
 import * as taskController from '../controllers/taskController.js'
-import { auth } from '../middlewares/auth.js'
+import { auth, requireAdmin } from '../middlewares/auth.js'
 import { validate } from '../middlewares/validator.js'
 import { requireTaskPermission, TaskAction } from '../middlewares/taskPermission.js'
 
@@ -63,6 +63,27 @@ router.get('/', auth, taskController.getTasks)
  * @access  Private
  */
 router.get('/categories', auth, taskController.getTaskCategories)
+
+/**
+ * @route   GET /api/tasks/deliverable-options
+ * @desc    获取交付成果选项列表
+ * @access  Private
+ */
+router.get('/deliverable-options', auth, taskController.getDeliverableOptions)
+
+/**
+ * @route   POST /api/tasks/deliverable-options
+ * @desc    新增交付成果选项
+ * @access  Private (Admin)
+ */
+router.post('/deliverable-options', auth, requireAdmin, taskController.createDeliverableOption)
+
+/**
+ * @route   DELETE /api/tasks/deliverable-options/:id
+ * @desc    删除交付成果选项
+ * @access  Private (Admin)
+ */
+router.delete('/deliverable-options/:id', auth, requireAdmin, taskController.deleteDeliverableOption)
 
 /**
  * @route   GET /api/tasks/tags

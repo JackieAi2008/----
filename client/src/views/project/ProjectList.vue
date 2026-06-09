@@ -30,26 +30,6 @@
       </button>
     </div>
 
-    <!-- 分类筛选（仅进行中Tab显示） -->
-    <div v-if="activeTab === 'active'" class="flex flex-wrap gap-2 mb-5">
-      <button
-        @click="activeCategory = 'ALL'"
-        class="px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
-        :class="activeCategory === 'ALL' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
-      >
-        全部
-      </button>
-      <button
-        v-for="cat in categoryOptions"
-        :key="cat.value"
-        @click="activeCategory = cat.value"
-        class="px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
-        :class="activeCategory === cat.value ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
-      >
-        {{ cat.label }}
-      </button>
-    </div>
-
     <!-- 进行中项目 -->
     <template v-if="activeTab === 'active'">
       <div v-if="projectStore.loading" class="text-center py-16 text-gray-500">
@@ -108,13 +88,6 @@
               :class="project.visibility === 'PUBLIC' ? 'bg-green-500/90 text-white' : 'bg-gray-900/70 text-white'"
             >
               {{ project.visibility === 'PUBLIC' ? '公开' : '私密' }}
-            </span>
-            <!-- 分类标签 -->
-            <span
-              v-if="project.category"
-              class="absolute bottom-3 left-3 px-2.5 py-1 text-xs rounded-lg font-medium bg-indigo-500/90 text-white backdrop-blur-sm"
-            >
-              {{ getCategoryLabel(project.category) }}
             </span>
             <!-- 部门标签 -->
             <span
@@ -224,13 +197,6 @@
                     <option value="PUBLIC">公开</option>
                   </select>
                 </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">项目分类 <span class="text-red-500">*</span></label>
-                  <select v-model="newProject.category" class="input cursor-pointer" required>
-                    <option value="" disabled>请选择分类</option>
-                    <option v-for="cat in categoryOptions" :key="cat.value" :value="cat.value">{{ cat.label }}</option>
-                  </select>
-                </div>
               </div>
             </div>
             <div class="flex justify-end gap-3 px-6 py-4 bg-gray-50/50 rounded-b-2xl">
@@ -300,8 +266,7 @@ import { useRouter } from 'vue-router'
 import { Plus, FolderOpen, FolderKanban, Trash2, Archive, ArchiveRestore } from 'lucide-vue-next'
 import { useProjectStore } from '@/stores/project'
 import { archiveProject, unarchiveProject } from '@/api/project'
-import type { Project, ProjectCategory } from '@/types/project'
-import { PROJECT_CATEGORY_MAP, PROJECT_CATEGORY_OPTIONS } from '@/types/project'
+import type { Project } from '@/types/project'
 import { getRelativeTime } from '@/utils/date'
 import { devLog } from '@/utils/logger'
 import { useToast } from '@/composables/useToast'
@@ -311,31 +276,18 @@ const projectStore = useProjectStore()
 const toast = useToast()
 
 const activeTab = ref<'active' | 'archived'>('active')
-const activeCategory = ref<ProjectCategory | 'ALL'>('ALL')
 const showCreateProject = ref(false)
 const creating = ref(false)
 const showDeleteConfirm = ref(false)
 const projectToDelete = ref<Project | null>(null)
 const deleting = ref(false)
 
-const projects = computed(() => {
-  const all = projectStore.activeProjects
-  if (activeCategory.value === 'ALL') return all
-  return all.filter(p => p.category === activeCategory.value)
-})
-
-const categoryOptions = PROJECT_CATEGORY_OPTIONS
-
-function getCategoryLabel(category: ProjectCategory | null | undefined): string {
-  if (!category) return '未分类'
-  return PROJECT_CATEGORY_MAP[category] || '未分类'
-}
+const projects = computed(() => projectStore.activeProjects)
 
 const newProject = reactive({
   name: '',
   description: '',
-  visibility: 'PRIVATE' as 'PUBLIC' | 'PRIVATE',
-  category: '' as ProjectCategory | ''
+  visibility: 'PRIVATE' as 'PUBLIC' | 'PRIVATE'
 })
 
 function goToProject(id: string) {
@@ -348,24 +300,17 @@ async function handleCreateProject() {
     return
   }
 
-  if (!newProject.category) {
-    alert('请选择项目分类')
-    return
-  }
-
   creating.value = true
   try {
     const project = await projectStore.createProject({
       name: newProject.name.trim(),
       description: newProject.description.trim() || undefined,
-      visibility: newProject.visibility,
-      category: newProject.category as ProjectCategory
+      visibility: newProject.visibility
     })
     showCreateProject.value = false
     newProject.name = ''
     newProject.description = ''
     newProject.visibility = 'PRIVATE'
-    newProject.category = ''
     router.push(`/projects/${project.id}`)
   } catch (error) {
     devLog.error('创建项目失败', error)

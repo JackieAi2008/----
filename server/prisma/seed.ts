@@ -35,6 +35,22 @@ async function main() {
     }
   }
 
+  // 创建默认交付成果选项
+  const deliverableOptions = ['活动新闻', '活动方案']
+
+  for (const option of deliverableOptions) {
+    const existing = await prisma.deliverableOption.findFirst({
+      where: { name: option }
+    })
+
+    if (!existing) {
+      await prisma.deliverableOption.create({
+        data: { name: option }
+      })
+      console.log(`创建交付成果选项: ${option}`)
+    }
+  }
+
   // 创建超级管理员账号（可选）
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com'
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin123'

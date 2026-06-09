@@ -36,11 +36,12 @@ const STATUS_MAP: Record<string, string> = {
   CANCELLED: '已取消'
 }
 
-// 优先级映射
+// 优先级映射（四象限）
 const PRIORITY_MAP: Record<string, string> = {
-  HIGH: '高',
-  MEDIUM: '中',
-  LOW: '低'
+  IMPORTANT_URGENT: '重要且紧急',
+  IMPORTANT_NOT_URGENT: '重要不紧急',
+  URGENT_NOT_IMPORTANT: '紧急不重要',
+  NOT_IMPORTANT_NOT_URGENT: '不重要不紧急'
 }
 
 // 可见性映射

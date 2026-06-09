@@ -142,12 +142,6 @@
                 </p>
               </div>
               <span
-                v-if="project.category"
-                class="px-2 py-1 text-xs rounded-lg font-medium bg-indigo-100 text-indigo-700"
-              >
-                {{ PROJECT_CATEGORY_MAP[project.category] }}
-              </span>
-              <span
                 class="px-2.5 py-1 text-xs rounded-lg font-medium"
                 :class="project.visibility === 'PUBLIC' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
               >
@@ -172,7 +166,7 @@ import { useAuthStore } from '@/stores/auth'
 import { getDashboard, type DashboardData } from '@/api/dashboard'
 import { formatDate as formatDateUtil } from '@/utils/date'
 import { devLog } from '@/utils/logger'
-import { PROJECT_CATEGORY_MAP } from '@/types/project'
+// Project category display removed
 import ExpandableStatCard, { type StatCardItem } from '@/components/dashboard/ExpandableStatCard.vue'
 
 const router = useRouter()
@@ -272,21 +266,23 @@ function getOverdueDays(dateStr: string): number {
 }
 
 function getPriorityClass(priority: string): string {
-  switch (priority) {
-    case 'HIGH': return 'bg-red-100 text-red-700'
-    case 'MEDIUM': return 'bg-yellow-100 text-yellow-700'
-    case 'LOW': return 'bg-gray-100 text-gray-600'
-    default: return 'bg-gray-100 text-gray-600'
+  const map: Record<string, string> = {
+    IMPORTANT_URGENT: 'bg-red-100 text-red-700',
+    IMPORTANT_NOT_URGENT: 'bg-blue-100 text-blue-700',
+    URGENT_NOT_IMPORTANT: 'bg-orange-100 text-orange-700',
+    NOT_IMPORTANT_NOT_URGENT: 'bg-gray-100 text-gray-600'
   }
+  return map[priority] || 'bg-gray-100 text-gray-600'
 }
 
 function getPriorityText(priority: string): string {
-  switch (priority) {
-    case 'HIGH': return '高'
-    case 'MEDIUM': return '中'
-    case 'LOW': return '低'
-    default: return '中'
+  const map: Record<string, string> = {
+    IMPORTANT_URGENT: '重要且紧急',
+    IMPORTANT_NOT_URGENT: '重要不紧急',
+    URGENT_NOT_IMPORTANT: '紧急不重要',
+    NOT_IMPORTANT_NOT_URGENT: '不重要不紧急'
   }
+  return map[priority] || '重要且紧急'
 }
 
 function goToTask(taskId: string | StatCardItem) {

@@ -9,6 +9,36 @@ import type {
   UpdateTaskRequest
 } from '@/types/task'
 
+// ========== 交付成果选项 ==========
+
+export interface DeliverableOption {
+  id: string
+  name: string
+}
+
+/**
+ * 获取交付成果选项列表
+ */
+export async function getDeliverableOptions(): Promise<DeliverableOption[]> {
+  const response = await get<DeliverableOption[]>('/tasks/deliverable-options')
+  return response.data ?? []
+}
+
+/**
+ * 新增交付成果选项（管理员）
+ */
+export async function createDeliverableOption(name: string): Promise<DeliverableOption> {
+  const response = await post<DeliverableOption>('/tasks/deliverable-options', { name })
+  return response.data!
+}
+
+/**
+ * 删除交付成果选项（管理员）
+ */
+export async function deleteDeliverableOption(id: string): Promise<void> {
+  await del(`/tasks/deliverable-options/${id}`)
+}
+
 /**
  * 获取任务列表
  */

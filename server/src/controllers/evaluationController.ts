@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 中集智历 - 评价控制器
  * 全局管理者（isAdmin=true）可对部门所有工作进行五星评价
  */
@@ -14,16 +14,6 @@ import { AuthRequest } from '../middlewares/auth.js'
 export async function createEvaluation(req: Request, res: Response) {
   const userId = (req as AuthRequest).userId
   const { taskId, targetUserId, rating, comment } = req.body
-
-  // 权限检查：仅管理员
-  const currentUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { isAdmin: true }
-  })
-
-  if (!currentUser?.isAdmin) {
-    throw new ApiError(403, '仅全局管理员可以进行评价')
-  }
 
   // 参数校验
   if (!taskId || !targetUserId) {
@@ -41,6 +31,33 @@ export async function createEvaluation(req: Request, res: Response) {
 
   if (!task) {
     throw new ApiError(404, '任务不存在')
+  }
+
+  // 权限检查：全局管理员 OR 项目所在部门的部门管理员
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isAdmin: true }
+  })
+
+  if (!currentUser?.isAdmin) {
+    // 非全局管理员：必须是被评价任务所属项目所在部门的部门管理员
+    const project = await prisma.project.findUnique({
+      where: { id: task.projectId },
+      select: { departmentId: true }
+    })
+
+    if (!project?.departmentId) {
+      throw new ApiError(403, '仅全局管理员或部门管理员可以进行评价')
+    }
+
+    const department = await prisma.department.findUnique({
+      where: { id: project.departmentId },
+      select: { adminId: true }
+    })
+
+    if (department?.adminId !== userId) {
+      throw new ApiError(403, '仅全局管理员或本部门管理员可以进行评价')
+    }
   }
 
   // 检查被评价人是否是该任务的负责人或协作者

@@ -1358,3 +1358,97 @@ export async function deleteDeliverableOption(req: Request, res: Response) {
     message: '删除成功'
   })
 }
+
+/**
+ * 生成任务 AI 工作总结
+ * 收集任务关键节点 + 进展记录 (Comment type=PROGRESS)，调用 DeepSeek 生成简洁总结；失败时降级为基础摘要。
+ * 阶段 1：项目详情「工作总结」区块的「AI 总结」按钮调用。
+ */
+export async function aiTaskSummary(req: Request, res: Response) {
+  const { id } = req.params
+
+  const task = await prisma.task.findFirst({
+    where: { id, deletedAt: null },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+      priority: true,
+      comments: {
+        where: { deletedAt: null, type: 'PROGRESS' },
+        orderBy: { createdAt: 'asc' },
+        select: { content: true, createdAt: true }
+      },
+      evaluations: {
+        select: { rating: true, comment: true }
+      }
+    }
+  })
+
+  if (!task) {
+    throw new ApiError(404, '任务不存在')
+  }
+
+  const progressLines = task.comments
+    .map((p) => '- ' + p.content)
+    .join('\n')
+
+  const fallbackContent =
+    '【' + task.title + ' 工作总结】\n' +
+    '关键节点：' + ((task.description || '未填写').slice(0, 80)) + '\n' +
+    '状态：' + task.status + ' | 优先级：' + task.priority + '\n' +
+    '进展记录 ' + task.comments.length + ' 条：\n' +
+    (progressLines || '- 暂无进展记录')
+
+  const deepseekKey = process.env.DEEPSEEK_API_KEY
+  let aiContent: string | null = null
+  let fallback = true
+
+  if (deepseekKey) {
+    try {
+      const prompt =
+        '请基于以下任务关键节点和进展记录，生成一段简洁的工作总结（200 字以内）：\n\n' +
+        '【关键节点】' + (task.description || '（无）') + '\n\n' +
+        '【进展记录】\n' + (progressLines || '（暂无）') + '\n\n总结：'
+
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 15000)
+      const resp = await fetch((process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com') + '/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + deepseekKey
+        },
+        body: JSON.stringify({
+          model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.5,
+          max_tokens: 600
+        }),
+        signal: controller.signal
+      })
+      clearTimeout(timer)
+      if (resp.ok) {
+        const data = (await resp.json()) as { choices?: Array<{ message?: { content?: string } }> }
+        const text = data?.choices?.[0]?.message?.content
+        if (typeof text === 'string' && text.trim()) {
+          aiContent = text.trim()
+          fallback = false
+        }
+      }
+    } catch {
+      // 走降级
+    }
+  }
+
+  res.json({
+    success: true,
+    data: {
+      taskId: task.id,
+      content: aiContent || fallbackContent,
+      fallback,
+      generatedAt: new Date().toISOString()
+    }
+  })
+}

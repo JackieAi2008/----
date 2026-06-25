@@ -470,20 +470,40 @@ export async function transferAdmin(req: Request, res: Response) {
 }
 
 /**
- * 获取部门成员列表（部门管理员）
+ * 获取部门成员列表（部门管理员或部门成员均可访问）
  */
 export async function getDepartmentMembers(req: Request, res: Response) {
   const currentUserId = (req as AuthRequest).userId
 
-  // 获取当前用户管理的部门
-  const department = await prisma.department.findUnique({
+  // 先尝试以部门管理员身份查找
+  let department = await prisma.department.findUnique({
     where: { adminId: currentUserId },
     select: { id: true, name: true }
   })
 
+  // 若非管理员，尝试以普通成员身份查找其所属部门
   if (!department) {
-    throw new ApiError(403, '您不是部门管理员')
+    const user = await prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: { departmentId: true }
+    })
+    if (user?.departmentId) {
+      department = await prisma.department.findUnique({
+        where: { id: user.departmentId },
+        select: { id: true, name: true }
+      })
+    }
   }
+
+  if (!department) {
+    throw new ApiError(403, '您不属于任何部门')
+  }
+
+  // 获取部门管理员 ID 用于标记
+  const deptAdmin = await prisma.department.findUnique({
+    where: { id: department.id },
+    select: { adminId: true }
+  })
 
   // 获取部门成员
   const members = await prisma.user.findMany({
@@ -506,7 +526,7 @@ export async function getDepartmentMembers(req: Request, res: Response) {
       department,
       members: members.map(m => ({
         ...m,
-        isDepartmentAdmin: m.id === currentUserId
+        isDepartmentAdmin: m.id === (deptAdmin?.adminId ?? '')
       }))
     }
   })

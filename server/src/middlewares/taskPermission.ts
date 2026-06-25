@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 中集智历 - 任务权限中间件
  *
  * 权限规则：
@@ -22,7 +22,8 @@ export enum TaskAction {
   CHANGE_DUE_DATE = 'change_due_date',
   ADD_COLLABORATOR = 'add_collaborator',
   REMOVE_COLLABORATOR = 'remove_collaborator',
-  ADD_COMMENT = 'add_comment'
+  ADD_COMMENT = 'add_comment',
+  EVALUATE = 'evaluate',
 }
 
 // 扩展请求类型

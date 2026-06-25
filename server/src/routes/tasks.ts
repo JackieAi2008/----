@@ -156,6 +156,13 @@ router.get('/:id/activity', auth, taskController.getTaskActivity)
 router.post('/:id/progress', auth, taskController.addProgressRecord)
 
 /**
+ * @route   POST /api/tasks/:id/ai-summary
+ * @desc    任务 AI 工作总结（关键节点 + 进展记录 → DeepSeek，降级基础摘要）
+ * @access  Private
+ */
+router.post('/:id/ai-summary', auth, taskController.aiTaskSummary)
+
+/**
  * @route   POST /api/tasks
  * @desc    创建任务
  * @access  Private

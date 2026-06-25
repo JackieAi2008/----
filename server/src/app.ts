@@ -90,12 +90,15 @@ app.use(errorHandler)
 const PORT = parseInt(process.env.PORT || '3000', 10)
 const HOST = process.env.HOST || 'localhost'
 
-app.listen(PORT, HOST, () => {
-  console.log(`🚀 服务器已启动: http://${HOST}:${PORT}`)
-  console.log(`📝 环境: ${process.env.NODE_ENV || 'development'}`)
+// 仅在非测试环境下启动端口监听，避免 jest 多套件并发 EADDRINUSE
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, HOST, () => {
+    console.log(`🚀 服务器已启动: http://${HOST}:${PORT}`)
+    console.log(`📝 环境: ${process.env.NODE_ENV || 'development'}`)
 
-  // 启动定时任务调度器
-  startScheduler()
-})
+    // 启动定时任务调度器
+    startScheduler()
+  })
+}
 
 export default app

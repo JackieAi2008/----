@@ -4,6 +4,7 @@
 import { Router } from 'express'
 import { body } from 'express-validator'
 import * as projectController from '../controllers/projectController.js'
+import * as summaryController from '../controllers/summaryController.js'
 import { auth } from '../middlewares/auth.js'
 import { validate } from '../middlewares/validator.js'
 
@@ -50,47 +51,28 @@ router.get('/deleted', auth, projectController.getDeletedProjects)
  */
 router.get('/public', projectController.getPublicProjects)
 
-/**
- * @route   GET /api/projects/:id
- * @desc    获取项目详情
- * @access  Private
- */
-router.get('/:id', auth, projectController.getProjectById)
+// ===== 子资源路由（必须早于 /:id 通配） =====
 
 /**
- * @route   POST /api/projects
- * @desc    创建项目
- * @access  Private
+ * @route   GET /api/projects/:id/summaries
+ * @desc    获取项目工作总结列表
+ * @access  Private (项目成员 / 全局管理员)
  */
-router.post('/', auth, createProjectValidation, projectController.createProject)
+router.get('/:id/summaries', auth, summaryController.listSummaries)
 
 /**
- * @route   PUT /api/projects/:id
- * @desc    更新项目
+ * @route   POST /api/projects/:id/summaries
+ * @desc    创建工作总结（项目负责人 / 全局管理员）
  * @access  Private
  */
-router.put('/:id', auth, updateProjectValidation, projectController.updateProject)
+router.post('/:id/summaries', auth, summaryController.createSummary)
 
 /**
- * @route   DELETE /api/projects/:id
- * @desc    删除项目（软删除）
+ * @route   POST /api/projects/:id/summaries/:summaryId/ai-summary
+ * @desc    触发 AI 总结（项目负责人 / 全局管理员 / 部门管理员）
  * @access  Private
  */
-router.delete('/:id', auth, projectController.deleteProject)
-
-/**
- * @route   POST /api/projects/:id/restore
- * @desc    恢复已删除的项目
- * @access  Private
- */
-router.post('/:id/restore', auth, projectController.restoreProject)
-
-/**
- * @route   DELETE /api/projects/:id/permanent
- * @desc    永久删除项目
- * @access  Private
- */
-router.delete('/:id/permanent', auth, projectController.permanentDeleteProject)
+router.post('/:id/summaries/:summaryId/ai-summary', auth, summaryController.generateProjectSummaryAI)
 
 /**
  * @route   GET /api/projects/:id/members
@@ -133,6 +115,50 @@ router.post('/:id/invite/accept', auth, projectController.acceptInvite)
  * @access  Private
  */
 router.post('/:id/invite/reject', auth, projectController.rejectInvite)
+
+// ===== /:id 通配路由（必须放在子资源之后） =====
+
+/**
+ * @route   GET /api/projects/:id
+ * @desc    获取项目详情
+ * @access  Private
+ */
+router.get('/:id', auth, projectController.getProjectById)
+
+/**
+ * @route   POST /api/projects
+ * @desc    创建项目
+ * @access  Private
+ */
+router.post('/', auth, createProjectValidation, projectController.createProject)
+
+/**
+ * @route   PUT /api/projects/:id
+ * @desc    更新项目
+ * @access  Private
+ */
+router.put('/:id', auth, updateProjectValidation, projectController.updateProject)
+
+/**
+ * @route   DELETE /api/projects/:id
+ * @desc    删除项目（软删除）
+ * @access  Private
+ */
+router.delete('/:id', auth, projectController.deleteProject)
+
+/**
+ * @route   POST /api/projects/:id/restore
+ * @desc    恢复已删除的项目
+ * @access  Private
+ */
+router.post('/:id/restore', auth, projectController.restoreProject)
+
+/**
+ * @route   DELETE /api/projects/:id/permanent
+ * @desc    永久删除项目
+ * @access  Private
+ */
+router.delete('/:id/permanent', auth, projectController.permanentDeleteProject)
 
 /**
  * @route   PUT /api/projects/:id/transfer

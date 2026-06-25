@@ -62,14 +62,14 @@
           </div>
         </div>
 
-        <!-- 核心工作及关键节点（原"任务描述"） -->
+        <!-- 关键节点（原“核心工作及关键节点”，阶段 1 去掉“核心工作”） -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">核心工作及关键节点</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">关键节点</label>
           <textarea
             v-model="form.description"
             class="input"
             rows="3"
-            placeholder="请输入核心工作及关键节点"
+            placeholder="请输入关键节点"
           ></textarea>
         </div>
 

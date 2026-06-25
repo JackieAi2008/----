@@ -137,13 +137,30 @@ export async function getArchivedTasks(params?: {
   return response.data ?? []
 }
 
-/**
- * 恢复归档任务
- */
-export async function unarchiveTask(id: string): Promise<Task> {
-  const response = await put<Task>(`/tasks/${id}/unarchive`)
-  return response.data!
-}
+  /**
+   * 恢复归档任务
+   */
+  export async function unarchiveTask(id: string): Promise<Task> {
+    const response = await put<Task>(`/tasks/${id}/unarchive`)
+    return response.data!
+  }
+
+  /**
+   * 阶段 1：任务 AI 工作总结
+   */
+  export interface AITaskSummaryResult {
+    taskId: string
+    content: string
+    fallback: boolean
+    generatedAt: string
+  }
+
+  export async function aiTaskSummary(id: string): Promise<AITaskSummaryResult> {
+    const response = await post<AITaskSummaryResult>(`/tasks/${id}/ai-summary`, undefined, {
+      timeout: 30000
+    })
+    return response.data!
+  }
 
 /**
  * 批量更新任务

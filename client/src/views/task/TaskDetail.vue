@@ -132,9 +132,9 @@
         </div>
       </div>
 
-      <!-- 核心工作及关键节点 -->
+      <!-- 关键节点（原“核心工作及关键节点”，阶段 1 去掉“核心工作”） -->
       <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        <h2 class="text-lg font-semibold text-gray-800 mb-4">核心工作及关键节点</h2>
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">关键节点</h2>
         <p v-if="task.description" class="text-gray-600 whitespace-pre-wrap">
           {{ task.description }}
         </p>
@@ -195,9 +195,33 @@
         <p v-else class="text-gray-400">暂无协作者</p>
       </div>
 
-      <!-- 进展跟踪 -->
+      <!-- 工作总结（原“进展跟踪”，阶段 1 由负责人撰写） -->
       <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        <h2 class="text-lg font-semibold text-gray-800 mb-4">进展跟踪</h2>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-gray-800">工作总结</h2>
+          <button
+            @click="generateAiSummary"
+            :disabled="generatingSummary"
+            class="inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 disabled:opacity-50"
+            title="基于关键节点 + 进展记录生成 AI 总结"
+          >
+            <Loader2 v-if="generatingSummary" class="w-4 h-4 animate-spin" />
+            <Sparkles v-else class="w-4 h-4" />
+            {{ generatingSummary ? '生成中...' : 'AI 总结' }}
+          </button>
+        </div>
+        <!-- AI 总结结果展示 -->
+        <div v-if="aiSummary" class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+          <div class="flex items-center gap-2 mb-2">
+            <Sparkles class="w-4 h-4 text-purple-600" />
+            <span class="text-sm font-medium text-purple-700">AI 总结</span>
+            <span v-if="aiSummaryFallback" class="text-xs text-gray-500">（未配置 DeepSeek，使用基础摘要）</span>
+          </div>
+          <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ aiSummary }}</p>
+        </div>
+        <div v-else-if="aiSummaryError" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p class="text-sm text-red-700">AI 总结生成失败：{{ aiSummaryError }}</p>
+        </div>
         <!-- 填写进展 -->
         <div class="mb-4">
           <textarea
@@ -244,9 +268,9 @@
         </div>
       </div>
 
-      <!-- 评论区 -->
+      <!-- 工作评价（原“评论”，阶段 1 由部门管理员撰写） -->
       <div class="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 class="text-lg font-semibold text-gray-800 mb-4">评论 ({{ task.comments?.length || 0 }})</h2>
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">工作评价 ({{ task.comments?.length || 0 }})</h2>
 
         <!-- 发表评论 -->
         <div class="mb-6">
@@ -425,8 +449,8 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { FolderKanban, User, Pencil, Trash2, X, MessageCircle, Repeat } from 'lucide-vue-next'
-import { getTask, updateTask, deleteTask, removeTaskCollaborator, unarchiveTask } from '@/api/task'
+import { FolderKanban, User, Pencil, Trash2, X, MessageCircle, Repeat, Sparkles, Loader2 } from 'lucide-vue-next'
+import { getTask, updateTask, deleteTask, removeTaskCollaborator, unarchiveTask, aiTaskSummary } from '@/api/task'
 import { formatDateTime as formatDateUtil, formatDate as formatDateOnly } from '@/utils/date'
 import { devLog } from '@/utils/logger'
 import { getTagColorClasses } from '@/utils/tagColor'
@@ -452,6 +476,10 @@ const newProgress = ref('')
 const submittingProgress = ref(false)
 const activities = ref<any[]>([])
 const activityLoading = ref(false)
+const aiSummary = ref<string>('')
+const aiSummaryFallback = ref<boolean>(false)
+const generatingSummary = ref(false)
+const aiSummaryError = ref<string>('')
 
 // 计算属性
 const taskId = computed(() => route.params.id as string)
@@ -472,6 +500,25 @@ const topLevelComments = computed(() => {
 function getCommentReplies(commentId: string): Comment[] {
   if (!task.value?.comments) return []
   return task.value.comments.filter(c => c.replyToId === commentId)
+}
+
+// AI 总结：调用后端 aiTaskSummary，将结果展示在工作总结区下方
+async function generateAiSummary() {
+  if (!task.value) return
+  aiSummaryError.value = ''
+  aiSummary.value = ''
+  aiSummaryFallback.value = false
+  generatingSummary.value = true
+  try {
+    const result = await aiTaskSummary(task.value.id)
+    aiSummary.value = result.content
+    aiSummaryFallback.value = result.fallback
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'AI 总结生成失败'
+    aiSummaryError.value = msg
+  } finally {
+    generatingSummary.value = false
+  }
 }
 
 // 获取回复的目标用户名

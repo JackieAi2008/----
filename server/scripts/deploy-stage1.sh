@@ -31,13 +31,14 @@
 #    SKIP_RSYNC=1 SKIP_BUILD=1 server/scripts/deploy-stage1.sh
 #
 #  可跳步骤(SKIP_<STEP>=1):
-#    SKIP_RSYNC     不 rsync(默认本地跑会 rsync;远端跑会自动跳过)
-#    SKIP_GENERATE  跳过 prisma generate
-#    SKIP_MIGRATE   跳过 prisma migrate deploy
-#    SKIP_DATA_FIX  跳过 add-wangtian-to-projects.cjs
-#    SKIP_BUILD     跳过 tsc(若手工跑了 build)
-#    SKIP_PM2       跳过 pm2 restart
-#    SKIP_PROBE     跳过最后的 probe
+#    SKIP_RSYNC       不 rsync(默认本地跑会 rsync;远端跑会自动跳过)
+#    SKIP_NPM_INSTALL 跳过 npm ci --include=dev(产线 node_modules 缺 devDeps 时必跑,产线原本只装了运行时)
+#    SKIP_GENERATE    跳过 prisma generate
+#    SKIP_MIGRATE     跳过 prisma migrate deploy
+#    SKIP_DATA_FIX    跳过 add-wangtian-to-projects.cjs
+#    SKIP_BUILD       跳过 tsc(若手工跑了 build)
+#    SKIP_PM2         跳过 pm2 restart
+#    SKIP_PROBE       跳过最后的 probe
 #
 #  退出码:
 #    0   全部步骤成功
@@ -64,6 +65,7 @@ readonly LOCAL_SRC="${LOCAL_SRC:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 # 步骤名 → 描述
 declare -A STEP_DESC=(
   [rsync]="rsync 本地 server/ → ${REMOTE_HOST}:${REMOTE_DIR}"
+  [npm_install]="npm ci --include=dev(产线 node_modules 可能没装 devDeps,关键:prisma + typescript)"
   [generate]="prisma generate(重新生成 @prisma/client)"
   [migrate]="prisma migrate deploy(apply 20260625000000_add_project_summary)"
   [data_fix]="add-wangtian-to-projects.cjs(王田补 5 个核心项目成员)"
@@ -72,7 +74,7 @@ declare -A STEP_DESC=(
   [probe]="probe-stage1.sh 7 端点 + 1 表 + 1 SQL 验证"
 )
 # 默认执行顺序
-readonly STEPS=(rsync generate migrate data_fix build pm2 probe)
+readonly STEPS=(rsync npm_install generate migrate data_fix build pm2 probe)
 
 # ---------- 运行模式检测 ----------
 # 远端目录以 /opt/zjzl-calendar/ 开头 → 在生产远端上
@@ -227,6 +229,44 @@ step_generate() {
   log_ok "prisma client 已重新生成"
 }
 
+step_npm_install() {
+  log_step "npm_install" "${STEP_DESC[npm_install]}"
+  # 产线 node_modules 是 rsync exclude 的(怕跨架构不兼容),但 devDeps (prisma / typescript) 必须有
+  # 否则 npx prisma generate / npx tsc 都跑不起来
+  # 检测: 看关键 devDep 是否在 node_modules
+  if [[ $IS_REMOTE -eq 1 ]]; then
+    (
+      cd "$REMOTE_DIR"
+      local need_install=0
+      local missing_pkgs=()
+      # 关键 devDeps
+      for pkg in typescript prisma @types/node; do
+        if [[ ! -d "node_modules/$pkg" ]]; then
+          need_install=1
+          missing_pkgs+=("$pkg")
+        fi
+      done
+      if [[ $need_install -eq 0 ]]; then
+        log_ok "关键 devDeps 已存在,跳过 npm install"
+        return
+      fi
+      log_warn "缺失 devDeps: ${missing_pkgs[*]}"
+      log_warn "执行 npm ci --include=dev 补齐"
+      # 优先用 npm ci(读 lock 文件,版本精确);失败回退 npm install
+      if [[ -f package-lock.json ]]; then
+        maybe_run npm ci --include=dev --omit=optional --no-audit --no-fund \
+          || maybe_run npm install --include=dev --omit=optional --no-audit --no-fund
+      else
+        maybe_run npm install --include=dev --omit=optional --no-audit --no-fund
+      fi
+    )
+  else
+    # 本地模式: 直接跑(本机 node_modules 本身就有 devDeps,这一步理论上 no-op)
+    maybe_run bash -c "cd '$LOCAL_SRC' && [[ -d node_modules/typescript ]] && echo 'devDeps 已存在,跳过' || npm ci --include=dev --no-audit --no-fund"
+  fi
+  log_ok "node_modules devDeps 已就位"
+}
+
 step_migrate() {
   log_step "migrate" "${STEP_DESC[migrate]}"
   backup_state  # 迁移前先备份 db
@@ -319,13 +359,14 @@ main() {
   for s in "${STEPS[@]}"; do
     if should_run "$s"; then
       case "$s" in
-        rsync)    step_rsync ;;
-        generate) step_generate ;;
-        migrate)  step_migrate ;;
-        data_fix) step_data_fix ;;
-        build)    step_build ;;
-        pm2)      step_pm2 ;;
-        probe)    step_probe ;;
+        rsync)       step_rsync ;;
+        npm_install) step_npm_install ;;
+        generate)    step_generate ;;
+        migrate)     step_migrate ;;
+        data_fix)    step_data_fix ;;
+        build)       step_build ;;
+        pm2)         step_pm2 ;;
+        probe)       step_probe ;;
       esac
     fi
   done

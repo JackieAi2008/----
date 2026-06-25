@@ -3,6 +3,8 @@
  */
 import { Request, Response } from 'express'
 import prisma from '../config/database.js'
+import { getYearlyDashboard } from '../services/yearlyDashboardService.js'
+import { ApiError } from '../middlewares/errorHandler.js'
 
 /**
  * 获取仪表盘数据
@@ -233,5 +235,41 @@ export async function getWorkStats(req: Request, res: Response) {
         end: end.toISOString()
       }
     }
+  })
+}
+
+/**
+ * 获取年度仪表盘数据 (R0 阶段 2)
+ *
+ * GET /api/dashboard/yearly?year=2026
+ *
+ * 业务定义见 yearlyDashboardService.ts:
+ *   - 自然年 (1/1 ~ 12/31)
+ *   - 我参与/可见 = assigneeId=me OR 协作人包含 me
+ *   - yearlyTotal = 全年任务 (yearlyTotal cap = 10000)
+ *   - yearlyTodo = 待办 (status 不在 DONE/CANCELLED)
+ *   - yearlyOverdue = 逾期 (dueDate < now 且 status != DONE)
+ *   - yearlyDone = 已完成
+ *   - byMonth = 12 个月分布 (按 dueDate 的 UTC 月份聚合)
+ */
+export async function getYearlyDashboardController(req: Request, res: Response) {
+  const userId = (req as { userId?: string }).userId!
+  const yearParam = req.query.year
+
+  if (yearParam === undefined || yearParam === null || yearParam === '') {
+    throw new ApiError(400, '缺少 year 参数')
+  }
+  const yearStr = String(yearParam)
+  // 严格解析:不允许 2026.5 这种 (parseInt 会 silently 截成 2026)
+  const year = Number(yearStr)
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    throw new ApiError(400, `year 越界: ${yearStr} (合法整数范围 2000..2100)`)
+  }
+
+  const data = await getYearlyDashboard(userId, year)
+
+  res.json({
+    success: true,
+    data
   })
 }

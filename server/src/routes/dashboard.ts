@@ -30,4 +30,12 @@ router.get('/stats', auth, dashboardController.getWorkStats)
  */
 router.post('/ai-summary', auth, aiSummaryLimiter, aiSummaryController.generateAISummary)
 
+/**
+ * @route   GET /api/dashboard/yearly
+ * @desc    获取年度看板数据 (R0 阶段 2)
+ * @query   year: number (2000..2100)
+ * @access  Private
+ */
+router.get('/yearly', auth, dashboardController.getYearlyDashboardController)
+
 export default router

@@ -80,5 +80,7 @@ Thumbs.db
 # ===== 一次性调试脚本 (不进入仓库) =====
 # 在线 DB 探针 — 临时调试,部署后会失效
 server/probe-online.cjs
-# 阶段 1 部署脚本 — 属于 zjzl-deploy 一次性动作,不入库
-server/scripts/deploy-stage1.sh
+# 阶段 1 部署三件套 (R0 阶段 1.5 部署抢救) — 随代码走,不入 ignore
+#   server/scripts/deploy-stage1.sh
+#   server/scripts/rollback-stage1.sh
+#   server/scripts/probe-stage1.sh

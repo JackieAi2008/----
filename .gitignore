@@ -1,38 +1,84 @@
+# ===== 依赖与构建产物 =====
 # 依赖
 node_modules/
 
 # 构建输出
 dist/
 client/dist/
+server/dist/
 
-# 环境变量（包含敏感密钥，绝不提交）
+# pnpm / vite 缓存
+server/node_modules/.modules.yaml
+server/node_modules/.pnpm-workspace-state-v1.json
+client/node_modules/.vite/
+server/node_modules/.vite/
+
+# ===== 数据库与本地文件 =====
+# Prisma 本地库 (任何 .db / .db-journal)
+*.db
+*.db-journal
+server/prisma/data.db
+server/prisma/test.db
+server/prisma/prisma/
+# seed/迁移脚本需要保留:
+#   server/prisma/schema.prisma
+#   server/prisma/migrations/
+#   server/prisma/seed.ts
+#   server/prisma/migration_lock.toml
+!server/prisma/schema.prisma
+!server/prisma/migrations/
+!server/prisma/seed.ts
+!server/prisma/migration_lock.toml
+
+# 日志目录
+server/logs/
+# 兜底:根目录的 .log 文件
+*.log
+npm-debug.log*
+
+# 测试覆盖率
+server/coverage/
+
+# ===== 环境变量 =====
+# 包含敏感密钥,绝不提交
+.env
+.env.local
+.env.*.local
 server/.env
 server/.env.test
 server/.env.local
 
-# 上传文件
+# ===== 上传与临时文件 =====
 uploads/
+*.tmp
+*.bak
 
-# 日志
-*.log
-npm-debug.log*
+# ===== Agent / Harness 运行时数据 (保留 .mavis/ 和 .harness/ 作为预期产物) =====
+# 老的 Claude Code 工作区状态
+.agents/
+.claude/
+# harness 与 mavis 目录本身是预期产物,不忽略
+!.harness/
+!.mavis/
+# 但 harness/mavis 内部的运行态数据仍可单独忽略
+.harness/repos/
+.mavis/scratchpads/
+.mavis/sessions/
 
-# 系统文件
+# ===== 系统与 IDE 文件 =====
 .DS_Store
 Thumbs.db
-
-# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Prisma
-server/prisma/*.db-journal
-
+# ===== 工具产物 =====
 # Playwright MCP
 .playwright-mcp/
 
-# 临时文件
-*.tmp
-*.bak
+# ===== 一次性调试脚本 (不进入仓库) =====
+# 在线 DB 探针 — 临时调试,部署后会失效
+server/probe-online.cjs
+# 阶段 1 部署脚本 — 属于 zjzl-deploy 一次性动作,不入库
+server/scripts/deploy-stage1.sh

@@ -49,7 +49,7 @@ export async function globalSearch(req: Request, res: Response) {
     }>,
     users: [] as Array<{
       id: string
-      nickname: string
+      nickname: string | null
       avatar?: string
       email: string
     }>,

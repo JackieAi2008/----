@@ -159,7 +159,7 @@ export async function getUserEvaluationStats(req: Request, res: Response) {
 
   // 按被评价人分组统计
   const userStatsMap = new Map<string, {
-    user: { id: string; nickname: string; avatar: string | null }
+    user: { id: string; nickname: string | null; avatar: string | null }
     totalRating: number
     count: number
     byProject: Map<string, { project: { id: string; name: string; category: string | null }; totalRating: number; count: number }>
@@ -235,7 +235,7 @@ export async function getProjectEvaluationStats(req: Request, res: Response) {
   // 按项目分组
   const projectMap = new Map<string, {
     project: { id: string; name: string; category: string | null }
-    evaluations: Array<{ targetUser: { id: string; nickname: string }; rating: number; comment: string | null; createdAt: Date }>
+    evaluations: Array<{ targetUser: { id: string; nickname: string | null }; rating: number; comment: string | null; createdAt: Date }>
     averageRating: number
   }>()
 

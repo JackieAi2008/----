@@ -103,7 +103,12 @@ Department          ProjectMember       TaskCollaborator
 | **`/api/projects/<id>/summaries`** | GET | 401 ≠ 404 | **404** | **未注册 — R0 阶段 1 新端点缺失** |
 | **`/api/tasks/<id>/ai-summary`** | POST | 401 ≠ 404 | **404** | **未注册 — R0 阶段 1 新端点缺失** |
 | `GET /api/evaluations/task/<id>` | GET | 401 | **401** | 阶段 0 老端点 OK |
-| **`/api/users`** | POST | 401 ≠ 404 | **404** | **未注册 — R0 阶段 1 新端点缺失** |
+| **`/api/users/create`** | POST | 401 ≠ 404 | **404** | **未注册 — R0 阶段 1 新端点缺失** |
+
+> **路径更正 (2026-06-25 16:32, zjzl-pm)**:
+> 上轮 audit 路径写 `/api/users` (POST),实际 `server/src/routes/users.ts:22` 注册的是 `/api/users/create`。
+> deploy 报告 §7 + verifier 报告 Check 1.1 A7 已确认真实路由为 `/api/users/create`。
+> 另:verifier §1.2 X1 额外探了 `/api/users` (无 `/create`),实际返回 **401** (不是 404) — 说明 `/api/users` 本身是**已注册的 GET 路由**(auth 中间件先于路由 handler 跑),audit 当时的 404 观察是错的,但**当前部署正确性不受影响**(因为 audit 关心的是 POST `/api/users/create` 是否挂载,A7 已确认挂载)。
 
 > 区分原则:401 = 路由可达但 JWT 校验未过(说明挂载了 `auth` 中间件);404 = 路由未挂载(没有这条路径)。
 
@@ -114,7 +119,7 @@ Department          ProjectMember       TaskCollaborator
 ### 6.1 结论性发现(全部 P0)
 
 1. **R0 阶段 1 三个新端点 100% 缺失**
-   `GET /api/projects/:id/summaries` / `POST /api/tasks/:id/ai-summary` / `POST /api/users` 在生产 3002 上**全部返回 404**,即 Express 路由表里根本没有这三条路径。
+   `GET /api/projects/:id/summaries` / `POST /api/tasks/:id/ai-summary` / `POST /api/users/create` 在生产 3002 上**全部返回 404**,即 Express 路由表里根本没有这三条路径。
 2. **`ProjectSummary` 数据库表不存在**
    既不在 `prisma/schema.prisma` 的 model 列表里,也不在 `data.db` 的 sqlite_master 里。
 3. **`prisma/migrations/20260625000000_add_project_summary` 在生产不存在**
@@ -169,3 +174,12 @@ Department          ProjectMember       TaskCollaborator
 ## 8. 一句话摘要(给 orchestrator)
 
 > **SSH 通;R0 阶段 1 在生产 100% 未生效:三个新端点全 404、`ProjectSummary` 表不存在、`add_project_summary` 迁移未 apply、王田未进 5 个核心项目;需要重做部署,先写 `deploy-stage1.sh` 并沙箱演练。**
+
+---
+
+## 9. 修正记录
+
+| 日期 | 版本 | 变更 | 原因 |
+|------|------|------|------|
+| 2026-06-25 14:58–15:10 | audit v1 | 起草;3 新端点列 `/api/users` (POST) → 404;ProjectSummary 表缺失 | T1 部署审计启动 |
+| 2026-06-25 16:32 | audit v1.1 (zjzl-pm) | (a) §5 表:`/api/users` → `/api/users/create`;(b) §5 补 verifier X1 注释 (`/api/users` 实际是 401 不是 404);(c) §6.1 #1 同步改 `/api/users/create` | deploy §7 + verifier §1.1 A7 真实路由确认,verifier §1.2 X1 新发现: `/api/users` 是已注册 GET 路由 (auth 中间件先于 handler 跑, 401 不是 404) |

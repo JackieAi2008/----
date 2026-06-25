@@ -46,7 +46,7 @@
 - [ ] 「工作评价」走 `Evaluation` 表
   - 在 `taskPermission.ts` 加 `TaskAction.EVALUATE` —— 限定 `DEPT_ADMIN` 角色(尹主任)或显式 `evaluatorId` 名单
   - 复用现有 `GET/POST /api/evaluations` 和 `GET /api/evaluations/task/:taskId`
-- [ ] 「王田」补用户:管理端在 `UserManage.vue` 加按钮 + `POST /api/users` 已存在,直接走
+- [ ] 「王田」补用户:管理端在 `UserManage.vue` 加按钮 + `POST /api/users/create` 已存在,直接走
 
 **前端**
 - [ ] `views/project/ProjectDetail.vue`
@@ -181,7 +181,7 @@
 | 「年度」口径 | 自然年 | 概念清晰、查询简单 |
 | 批量录入 | Excel 模板,后端动态生成 | 收敛字段、避免解析歧义 |
 | 邮件提醒 | 本轮**不做**,走方案 A 消息中心 | 0 依赖、立即上线;邮件作 P2 |
-| 「王田」补法 | 走 `POST /api/users` 标准接口 | 数据修复,非功能 |
+| 「王田」补法 | 走 `POST /api/users/create` 标准接口 | 数据修复,非功能 |
 | `Comment` vs `Evaluation` | 评价走 `Evaluation`,旧 `Comment` 数据保留只读 | 不破坏历史 |
 
 ## 8. 风险登记
@@ -200,3 +200,12 @@
 - 移动端响应式
 - 国际化(i18n)
 - 单点登录 / OAuth
+
+---
+
+## 10. 修正记录
+
+| 日期 | 版本 | 变更 | 原因 |
+|------|------|------|------|
+| 2026-06-24 | r0-plan v1 | 起草 5 阶段计划 | 反馈迭代 r0 启动 |
+| 2026-06-25 16:32 | r0-plan v1.1 (zjzl-pm) | (a) §2 后端:`POST /api/users` → `POST /api/users/create`;(b) §7 D4 决策:`POST /api/users` → `POST /api/users/create` | verifier §1.1 A7 真实路由确认 (`server/src/routes/users.ts:22` 注册 `/create`) |

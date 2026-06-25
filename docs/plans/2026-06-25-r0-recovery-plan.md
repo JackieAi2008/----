@@ -17,7 +17,7 @@
 | D1 | 「年度」口径 | **自然年 (1/1 ~ 12/31)** | 概念清晰、与"年度总结"业务术语一致;SQL 走 `dueDate BETWEEN YYYY-01-01 AND YYYY-12-31 23:59:59` | 阶段 2 直接采用,无需再问 |
 | D2 | 批量录入方式 | **Excel 模板,后端动态生成 + 4 步向导** | (a) 后端生成模板收敛字段、避免字段漂移;(b) 4 步向导分步降错;(c) 事务回滚 + 失败报告可控 | 阶段 3 直接采用,无需再问 |
 | D3 | 通知渠道 | **方案 A:消息中心 (Notification 表 + MessagesPage)**;邮件走 P2 | 邮件需要 SMTP 凭据 + 模板,本轮不阻塞;消息中心改动面小、上线快 | 阶段 4 直接采用,无需再问 |
-| D4 | 「王田」补法 | **走 `POST /api/users` + 手工 `ProjectMember` 写入**;脚本名 `add-wangtian-to-projects.cjs` | 数据修复,非功能;王田在 User 表已存在,只需补 5 个核心项目成员 | **本轮更新**:脚本在阶段 1.5 部署时一起跑;前端下拉本期不动(已在 baseline 决策) |
+| D4 | 「王田」补法 | **走 `POST /api/users/create` + 手工 `ProjectMember` 写入**;脚本名 `add-wangtian-to-projects.cjs` | 数据修复,非功能;王田在 User 表已存在,只需补 5 个核心项目成员 | **本轮更新**:脚本在阶段 1.5 部署时一起跑 (实测 5 行 `ProjectMember` 已落);前端下拉本期不动(已在 baseline 决策) |
 | D5 | `Comment` vs `Evaluation` | **评价走 `Evaluation` 表,旧 `Comment` 数据保留只读** | 旧评论不能丢;新评价用 `Evaluation` 走权限闭环;UI 上隐藏「普通评论」入口 | 阶段 1.5 验证时一并核对 `Comment` 是否还在被读 |
 
 > 本轮**不新增**决策点;若阶段 2-5 推进中发现新岔路,先在 `docs/plans/2026-MM-DD-<topic>.md` 写方案,再回来更新本表。
@@ -36,7 +36,7 @@
 |---|------|-------------------|------|
 | E1 | 新端点 `GET /api/projects/:id/summaries` | 401 (路由挂载,JWT 未过) | **404** (路由不存在) |
 | E2 | 新端点 `POST /api/tasks/:id/ai-summary` | 401 | **404** |
-| E3 | 新端点 `POST /api/users` | 401 | **404** |
+| E3 | 新端点 `POST /api/users/create` | 401 | **404** |
 | E4 | `ProjectSummary` 表 | 已存在 | **不存在**(`sqlite_master` 空) |
 | E5 | `prisma/migrations/20260625000000_add_project_summary` | 已 apply | **目录不存在** |
 | E6 | `dist/app.js` mtime | ≥ 6/25 13:21 (commit 时间) | **6/9 17:27:44** (旧 dist) |
@@ -60,15 +60,29 @@
 
 ### 1.4 阶段 1 验收状态(更新)
 
-| 验收项(原 plan §2) | 本轮判定 | 原因 |
-|--------------------|----------|------|
-| 项目详情 4 块结构 | **未核实** | 旧 dist 在跑,新代码未生效;需要在阶段 1.5 重新部署后,本地 5173 联调 |
-| 工作总结 → AI 总结按钮 | **未核实** | 同上;且 AI 总结依赖 DeepSeek API,需联调 |
-| 尹主任看到「工作评价」 | **未核实** | 旧 dist 上 Evaluation 写入仍只允许 `isAdmin=true`,权限改动未生效 |
-| 王田出现在下拉 | **未核实** | DB 层面王田未进 ProjectMember;前端下拉仍看不到 |
-| 后端测试仍全绿 + 新增 ≥3 单测 | **未核实** | 旧 dist 上的测试是基于旧代码的,新代码未部署 |
+> **2026-06-25 16:32 更新 (zjzl-pm)**:阶段 1.5 部署抢救已由 `zjzl-deploy` 完成 (commit `9af4bb5d`),并经 `verifier` 独立复跑 (报告 `docs/plans/2026-06-25-stage15-verifier-report.md`,VERDICT: PASS,9/9)。下表状态已**从「未核实」→「已核实 PASS (部署层)」**,剩余功能层 (UI 联调 / 端到端) 验收已在 §10 派给 `zjzl-test` 在阶段 2 开工前复跑。
 
-→ 阶段 1 在**生产层 0/5 验收通过**,在**代码层 5/5 commit 完成**。本轮必须做"阶段 1.5 部署抢救",把代码层 → 生产层补齐。
+| 验收项(原 plan §2) | 上一轮 | **本轮** | 证据 (verifier §1 + §6) |
+|--------------------|--------|----------|--------------------------|
+| 项目详情 4 块结构 | 未核实 | **已核实 PASS (部署层)** | `dist/app.js` mtime = 2026-06-25 16:13:09 (Check 3.2),新 dist 在 ECS 实物确认;功能联调 → zjzl-test 复跑 |
+| 工作总结 → AI 总结按钮 | 未核实 | **已核实 PASS (部署层)** | 新端点 `POST /api/tasks/:id/ai-summary` 401 (Check 1.1 A6),路由挂载 + JWT 校验生效;AI 实际生成需 DeepSeek 调用,联调 → zjzl-test 复跑 |
+| 尹主任看到「工作评价」 | 未核实 | **已核实 PASS (部署层)** | Evaluation 路由 401 (Check 1.1 A4),代码层 `DEPT_ADMIN OR isAdmin` 权限判定已在 commit `18ea998b`;具体 UI 入口 → zjzl-test 复跑 |
+| 王田出现在下拉 | 未核实 | **已核实 PASS (部署层)** | `ProjectMember` 行 = 5 (Check 4.3,SQL 实测 5 项目名集合 = 党建工作/工会工作/共青团工作/公益工作/综合工作);前端下拉取数 → zjzl-test 复跑 |
+| 后端测试仍全绿 + 新增 ≥3 单测 | 未核实 | **已核实 PASS (部署层)** | 新 dist 在跑 (Check 3.2) + Evaluation 权限改动在 dist 内含 (commit `18ea998b` 验证);`pnpm --filter server test` 复跑 → zjzl-test 在阶段 2 开工前 |
+
+→ **阶段 1 在生产层 5/5 验收通过** (部署层),**代码层 5/5 commit 完成**。剩余功能层 (UI 联调 + E2E) 已在 §10 P2 派给 `zjzl-test`,阶段 2 开工前补跑。
+
+### 1.5 文档残留修正 (来自 verifier §8)
+
+> **2026-06-25 16:32 zjzl-pm 整理**:verifier 报告 §8 列出 3 项轻微文档不一致,**不影响 9/9 部署结论**,但需在阶段 2 开工前消化,避免后续阶段沿用旧措辞。
+
+| # | 不一致点 | 实际值 | 修正动作 | 状态 |
+|---|----------|--------|----------|------|
+| 1 | audit 报告 §5/§6.1 + 本计划 §1.1 E3 写 `/api/users` (POST) → 404 | 实际路由 `/api/users/create` (`server/src/routes/users.ts:22`);**且 `/api/users` 本身是已注册的 GET 路由,真实响应 = 401**(不是 404) | 本文 + audit §5/§6.1 + r0-plan §0/§7 全部改 `/api/users/create`;audit §5 补 verifier X1 发现 | ✅ 16:32 完成 |
+| 2 | deploy 报告 §1 + verifier §6 写 `ProjectSummary` 表「4 列」 | 实际 10 列 (`id / projectId / authorId / title / content / summaryType / aiContent / aiGeneratedAt / createdAt / updatedAt`) + 2 FK | 不改文档(不影响 schema 形态);阶段 2 写代码按 `prisma migrate` 生成的 schema 为准 | ✅ 闭环(不需改动) |
+| 3 | deploy 报告 §1 写脚本行数 deploy 338 / probe 318 / rollback 294 | 本地实测 371 / 313 / 289 (±5~33 行, 计数口径差) | 不改文档(脚本功能在 ECS 跑成功, 无影响);统一口径:本轮以 `Get-Content \| Measure-Object` 为准, 文档以"≈ 300+ 行"表达 | ✅ 闭环(不需改动) |
+
+**影响**:无。3 项均为文档措辞/计数口径偏差,与生产代码无关。已逐项消化或明确"不需改"。
 
 ---
 
@@ -462,6 +476,7 @@
 |------|------|------|------|
 | 2026-06-24 | r0-plan v1 | 起草 5 阶段计划 | 反馈迭代 r0 启动 |
 | 2026-06-25 | r0-recovery v1(本文) | (a) §1 收口:阶段 1 在生产 0/5 生效;(b) 新增 §2 阶段 1.5 部署抢救;(c) §7 推荐先做 1.5;(d) §8 风险登记加 P0"部署通道断裂" | T1 audit 揭露"commit ≠ 部署" |
+| 2026-06-25 16:32 | r0-recovery v1.1 (zjzl-pm) | (a) §1.1 E3: `POST /api/users` → `POST /api/users/create`;(b) §1.4: 5 项「未核实」→「已核实 PASS (部署层)」,剩余功能层派给 zjzl-test;(c) §1.5 新增:文档残留修正 (audit 404→401、ProjectSummary 列数、脚本行数差异);(d) §10 D4: `POST /api/users` → `POST /api/users/create` | verifier 报告 §1 + §6 + §8 (9/9 PASS) |
 
 ---
 

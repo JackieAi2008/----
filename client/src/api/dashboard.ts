@@ -88,6 +88,27 @@ export async function getDashboard() {
   return response.data
 }
 
+// 年度看板数据类型 (R0 阶段 2)
+export interface YearlyDashboard {
+  year: number
+  yearlyTotal: number
+  yearlyTodo: number
+  yearlyOverdue: number
+  yearlyDone: number
+  byMonth: Array<{ month: number; total: number; done: number }>
+  truncated: boolean
+}
+
+/**
+ * 获取年度仪表盘数据 (R0 阶段 2)
+ * @param year 自然年 (2000..2100), 默认当前年
+ */
+export async function getYearlyDashboard(year?: number) {
+  const targetYear = year ?? new Date().getFullYear()
+  const response = await get<YearlyDashboard>(`/dashboard/yearly?year=${targetYear}`)
+  return response.data
+}
+
 /**
  * 获取工作统计数据
  */

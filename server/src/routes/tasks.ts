@@ -3,12 +3,28 @@
  */
 import { Router } from 'express'
 import { body } from 'express-validator'
+import multer from 'multer'
 import * as taskController from '../controllers/taskController.js'
+import * as importController from '../controllers/importController.js'
 import { auth, requireAdmin } from '../middlewares/auth.js'
 import { validate } from '../middlewares/validator.js'
 import { requireTaskPermission, TaskAction } from '../middlewares/taskPermission.js'
 
 const router = Router()
+
+// xlsx 上传 (内存存储, 10MB 上限)
+const importUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || /\.xlsx$/i.test(file.originalname)) {
+      cb(null, true)
+    } else {
+      // 拒绝 → cb(null, false) 让 controller 判空后返回 400 (避免 500)
+      cb(null, false)
+    }
+  }
+})
 
 // 创建任务验证规则
 const createTaskValidation = [
@@ -226,10 +242,36 @@ router.post('/:id/comments', auth, taskController.addComment)
 router.delete('/:id/comments/:commentId', auth, taskController.deleteComment)
 
 /**
- * @route   PUT /api/tasks/:id/unarchive
+ * @route   POST /api/tasks/:id/unarchive
  * @desc    恢复归档任务
  * @access  Private
  */
 router.put('/:id/unarchive', auth, taskController.unarchiveTask)
+
+// ===== R0 §3 任务批量导入 =====
+
+/**
+ * @route   POST /api/tasks/import/preview
+ * @desc    上传 xlsx, 返回 valid/invalid 预览 (不写库)
+ * @access  Private
+ */
+router.post(
+  '/import/preview',
+  auth,
+  importUpload.single('file'),
+  importController.previewTaskImport
+)
+
+/**
+ * @route   POST /api/tasks/import
+ * @desc    上传 xlsx 并执行批量导入 (单一事务, 整批回滚)
+ * @access  Private
+ */
+router.post(
+  '/import',
+  auth,
+  importUpload.single('file'),
+  importController.executeTaskImport
+)
 
 export default router

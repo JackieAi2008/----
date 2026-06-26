@@ -77,6 +77,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '归档任务' }
       },
       {
+        path: 'tasks/import',
+        name: 'TaskImport',
+        component: () => import('@/views/task/TaskImportPage.vue'),
+        meta: { title: '批量导入任务' }
+      },
+      {
         path: 'reports',
         name: 'Reports',
         component: () => import('@/views/reports/ReportsPage.vue'),

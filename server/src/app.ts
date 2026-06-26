@@ -28,6 +28,7 @@ import departmentRoutes from './routes/departments.js'
 import adminRoutes from './routes/admin.js'
 import calendarRoutes from './routes/calendar.js'
 import evaluationRoutes from './routes/evaluations.js'
+import importRoutes from './routes/import.js'
 
 // 导入中间件
 import { errorHandler } from './middlewares/errorHandler.js'
@@ -72,6 +73,7 @@ app.use('/api/departments', departmentRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/calendar', calendarRoutes)
 app.use('/api/evaluations', evaluationRoutes)
+app.use('/api/import', importRoutes)
 
 // 健康检查
 app.get('/api/health', (_req, res) => {

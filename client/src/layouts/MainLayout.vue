@@ -154,6 +154,16 @@
 
         <!-- 右侧操作区 -->
         <div class="flex items-center gap-2">
+          <!-- 批量导入任务按钮 (R0 §3) -->
+          <button
+            @click="showImportDialog = true"
+            class="px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1.5"
+            title="批量导入任务"
+          >
+            <Upload class="w-4 h-4" />
+            <span class="hidden md:inline">批量导入</span>
+          </button>
+
           <!-- 通知按钮 -->
           <button
             @click="showNotifications = !showNotifications"
@@ -211,6 +221,13 @@
       @close="showCreateTask = false"
       @saved="handleTaskSaved"
     />
+
+    <!-- 任务批量导入对话框 (R0 §3) -->
+    <TaskImportDialog
+      v-if="showImportDialog"
+      @close="showImportDialog = false"
+      @imported="handleImported"
+    />
   </div>
 </template>
 
@@ -220,7 +237,7 @@
  */
 import { ref, computed, onMounted, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Calendar, User, LogOut, Menu, Bell, Settings } from 'lucide-vue-next'
+import { Calendar, User, LogOut, Menu, Bell, Settings, Upload } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
@@ -229,6 +246,7 @@ import NotificationPanel from '@/components/common/NotificationPanel.vue'
 import GlobalSearch from '@/components/common/GlobalSearch.vue'
 import ShortcutHelp from '@/components/common/ShortcutHelp.vue'
 import TaskForm from '@/components/task/TaskForm.vue'
+import TaskImportDialog from '@/components/task/TaskImportDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -241,6 +259,7 @@ const sidebarOpen = ref(false)
 const showNotifications = ref(false)
 const showShortcutHelp = ref(false)
 const showCreateTask = ref(false)
+const showImportDialog = ref(false)
 
 // 提供全局方法给子组件
 provide('openNewTask', () => {
@@ -252,10 +271,14 @@ provide('openGlobalSearch', () => {
 provide('openShortcutHelp', () => {
   showShortcutHelp.value = true
 })
+provide('openImportDialog', () => {
+  showImportDialog.value = true
+})
 provide('closeDialog', () => {
   showShortcutHelp.value = false
   showCreateTask.value = false
   showNotifications.value = false
+  showImportDialog.value = false
 })
 
 // 当前路由
@@ -278,12 +301,20 @@ function closeAllDialogs() {
   showShortcutHelp.value = false
   showCreateTask.value = false
   showNotifications.value = false
+  showImportDialog.value = false
 }
 
 // 任务保存后的处理
 function handleTaskSaved() {
   showCreateTask.value = false
   // 可以在这里添加刷新任务列表的逻辑
+}
+
+// 导入成功后的处理
+function handleImported(_taskIds: string[]) {
+  showImportDialog.value = false
+  // 触发全局刷新, 通知相关页面拉新数据
+  window.dispatchEvent(new CustomEvent('tasks-imported'))
 }
 
 // 切换日历视图

@@ -13,7 +13,7 @@
 
 ---
 
-## 1. 需求清单 (15 条 user story)
+## 1. 需求清单 (19 条 user story)
 
 ### 1.1 上传 (4 条)
 
@@ -341,8 +341,10 @@ function buildLibraryWhere(currentUser: User): Prisma.LibraryAssetWhereInput {
 |------|--------|------|
 | 单文件 > 10MB | 413 | `{ error: 'FILE_TOO_LARGE', limit: 10485760 }` |
 | 非 image/* mime | 400 | `{ error: 'UNSUPPORTED_MIME', mimeType: '...' }` |
-| 单用户超 200MB | 507 | `{ error: 'USER_QUOTA_EXCEEDED', limit: 209715200, current: <bytes> }` |
-| 全站超 2GB | 507 | `{ error: 'ORG_QUOTA_EXCEEDED', limit: 2147483648, current: <bytes> }` |
+| 单用户超 200MB | 507 | `{ error: 'USER_QUOTA_EXCEEDED', limit: 209715200, current: <当前用户已用字节数, SUM(size) WHERE ownerId=? AND deletedAt IS NULL> }` |
+| 全站超 2GB | 507 | `{ error: 'ORG_QUOTA_EXCEEDED', limit: 2147483648, current: <全站已用字节数, SUM(size) WHERE deletedAt IS NULL> }` |
+
+> **字段语义**: `limit` 是配额上限 (bytes, 常量);`current` 是校验时的实际已用量 (bytes)。前端展示「已用 X MB / 上限 Y MB」时,X = `current / 1048576`,Y = `limit / 1048576` (向上取整到 MB)。
 | 编辑非本人 | 403 | `{ error: 'NOT_OWNER' }` |
 | 硬删非 admin | 403 | `{ error: 'ADMIN_REQUIRED' }` |
 | projectId 不存在 | 400 | `{ error: 'PROJECT_NOT_FOUND' }` |
@@ -423,7 +425,7 @@ function buildLibraryWhere(currentUser: User): Prisma.LibraryAssetWhereInput {
 
 ---
 
-## 5. 验收标准 (15 条)
+## 5. 验收标准 (21 条)
 
 ### 5.1 上传 (4)
 
@@ -459,7 +461,7 @@ function buildLibraryWhere(currentUser: User): Prisma.LibraryAssetWhereInput {
 - [ ] AC-5.6.2 部门公开图片 → 同部门用户 `GET /api/library` 可见,跨部门不可见
 - [ ] AC-5.6.3 admin `GET /api/library` 返回所有 (含私人),含 `ownerName` 标识
 
-### 5.7 容量 / 限额 (1)
+### 5.7 容量 / 限额 (4)
 
 - [ ] AC-5.7.1 用户上传到第 N 张使本人总量超 200MB → 返回 507 `USER_QUOTA_EXCEEDED` + 提示「您的资料库空间已满 (200MB),请删除旧图片」
 - [ ] AC-5.7.2 用户上传时全站总量已超 2GB → 返回 507 `ORG_QUOTA_EXCEEDED` + 提示「资料库总空间已满 (2GB),请等待管理员清理」
@@ -478,11 +480,17 @@ function buildLibraryWhere(currentUser: User): Prisma.LibraryAssetWhereInput {
 |------|------|------|------|
 | **大文件上传内存爆** | P0 | 上传 > 10MB | multer `diskStorage` (已用,非 memoryStorage);10MB 硬限 |
 | **磁盘爆盘** | P1 | 总量无限制 | 200MB/用户 + 2GB/全站双硬限;`du -sh` 监控;每日 03:00 cron 计算全站 sum(size) 作 ORG_QUOTA 校验源 |
+| **ORG_QUOTA race condition** | P1 | 多用户并发上传 | `SELECT SUM(size)` 实时算 → 两请求同时通过校验后双双 INSERT,可能短暂超过 2GB |
 | **恶意文件伪装 mime** | P1 | 改后缀绕过 mime 过滤 | 后端 `file-type` 库二次校验 magic number (在 multer 之后) |
 | **大图加载慢** | P1 | 单图 > 5MB | 缩略图 `sharp` resize → 240x240 webp (P2 必做);前端 `<img loading="lazy">` |
 | **EXIF 隐私泄漏** | P2 | 上传照片含 GPS / 设备信息 | sharp resize 时默认 strip metadata (P2) |
 | **批量下载 zip 内存** | P1 | 100 张打包 | `archiver` 流式写,不缓存到内存;limit 50 张/批 |
 | **回收站磁盘空间** | P2 | 30 天软删占空间 | 定时 job 真删 + 监控 `du -sh uploads/library/.trash` |
+
+> **ORG_QUOTA race condition 详细说明**: 单条 `SELECT SUM(size) WHERE deletedAt IS NULL` 在并发下不安全。两种缓解:
+> 1. **行级锁 (短期)**: `prisma.$transaction` + `SELECT ... FOR UPDATE` 在一个 `OrgQuota` 哨兵行(或 Postgres advisory lock)上串行化 ORG_QUOTA 校验 → 简单可靠。
+> 2. **计数表 (中期)**: 每日 03:00 cron 把 `SUM(size)` 物化到 `OrgQuotaCounter` 单行表;上传时 `UPDATE counter SET used = used + ? RETURNING used`,超限即拒。原子增量,无竞态。
+> §6a 实施时必须选一种落地;不能只靠"实时 SELECT"。USER_QUOTA 同理(同一用户的并发上传)。
 | **旧 Attachment 数据迁移** | P3 | 用户期望老附件可见 | 不迁移,UI 上「资料库」与「任务附件」明确分离 |
 | **oss 迁移兼容性** | P3 | 下阶段切云存储 | 抽象 `StorageProvider` 接口,本地 fs 实现 + OSS 实现并存 |
 | **病毒扫描** | P3 | 恶意文件传播 | 本轮不做;P2 clamav 接入 (上传后 async 扫描,失败置 `isQuarantined=true`) |

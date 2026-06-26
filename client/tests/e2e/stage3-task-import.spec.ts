@@ -1,7 +1,7 @@
 /**
- * 中集智历 - r0 §4 任务批量导入 E2E
+ * 中集智历 - r0 §3 任务批量导入 E2E
  *
- * 对应 r0-plan.md §4:任务批量导入 (2~3 天,覆盖需求 4)
+ * 对应 r0-plan.md §3:任务批量导入 (2~3 天,覆盖需求 4)
  * 拆 3a/3b/3c,本 spec 覆盖整条用户路径(下载模板→上传→预览→确认→失败回滚)。
  *
  * 验收点(从 plan 提取):
@@ -16,7 +16,7 @@ import { BASE_URL, setAuthToken, snapshot } from './_helpers'
 import path from 'node:path'
 import fs from 'node:fs/promises'
 
-test.describe('r0 §4 - 任务批量导入', () => {
+test.describe('r0 §3 - 任务批量导入', () => {
   const ENABLED = false
   const STAGE = 'stage3'
 

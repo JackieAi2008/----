@@ -242,7 +242,7 @@ router.post('/:id/comments', auth, taskController.addComment)
 router.delete('/:id/comments/:commentId', auth, taskController.deleteComment)
 
 /**
- * @route   POST /api/tasks/:id/unarchive
+ * @route   PUT /api/tasks/:id/unarchive
  * @desc    恢复归档任务
  * @access  Private
  */

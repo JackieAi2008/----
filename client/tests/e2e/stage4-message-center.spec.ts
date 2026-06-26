@@ -1,7 +1,7 @@
 /**
- * 中集智历 - r0 §5 消息中心 E2E
+ * 中集智历 - r0 §4 消息中心 E2E
  *
- * 对应 r0-plan.md §5:消息中心 (2~3 天,覆盖需求 6 方案 A)
+ * 对应 r0-plan.md §4:消息中心 (2~3 天,覆盖需求 6 方案 A)
  *
  * 验收点(从 plan + inbox-test-stage4.txt 提取):
  * - [ ] 切到任意 Tab,只显示对应 category
@@ -15,7 +15,7 @@
 import { test, expect } from '@playwright/test'
 import { BASE_URL, setAuthToken, snapshot } from './_helpers'
 
-test.describe('r0 §5 - 消息中心', () => {
+test.describe('r0 §4 - 消息中心', () => {
   const ENABLED = false
   const STAGE = 'stage4'
 

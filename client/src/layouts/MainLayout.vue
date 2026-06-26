@@ -424,10 +424,10 @@ registerAll([
   }
 ])
 
-// 获取通知数据
+// 获取通知数据(r0 §4: 铃铛角标走聚合接口,不走老 list 端点)
 onMounted(async () => {
   if (authStore.isAuthenticated) {
-    await notificationStore.fetchNotifications()
+    await notificationStore.fetchUnreadByCategory()
   }
 })
 </script>

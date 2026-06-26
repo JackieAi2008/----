@@ -8,6 +8,7 @@ import { getTaskPermissions } from '../middlewares/taskPermission.js'
 import { createNextRecurringTask } from '../services/recurringTaskService.js'
 import { AuthRequest } from '../middlewares/auth.js'
 import { writeAuditLog, logTaskChanges } from '../utils/auditLogger.js'
+import { send as sendNotification, sendMany as sendManyNotifications } from '../services/notificationService.js'
 
 // 解析 tags JSON 字符串为数组
 function parseTaskTags<T extends { tags?: string | null }>(task: T): T & { tags: string[] } {
@@ -250,15 +251,13 @@ export async function createTask(req: Request, res: Response) {
 
   // 发送通知给负责人
   if (assigneeId && assigneeId !== userId) {
-    await prisma.notification.create({
-      data: {
-        userId: assigneeId,
-        type: 'TASK_ASSIGNED',
-        title: '新任务指派',
-        content: `您被指派了新任务「${title}」`,
-        relatedType: 'TASK',
-        relatedId: task.id
-      }
+    await sendNotification({
+      userId: assigneeId,
+      category: 'TASK_REMINDER',
+      title: '新任务指派',
+      content: `您被指派了新任务「${title}」`,
+      relatedType: 'TASK',
+      relatedId: task.id
     })
   }
 
@@ -277,7 +276,7 @@ export async function createTask(req: Request, res: Response) {
       .filter(id => id !== userId && id !== assigneeId)
       .map(id => ({
         userId: id,
-        type: 'TASK_COLLABORATOR',
+        category: 'TASK_REMINDER' as const,
         title: '协作任务邀请',
         content: `您被邀请协作任务「${title}」`,
         relatedType: 'TASK',
@@ -285,7 +284,7 @@ export async function createTask(req: Request, res: Response) {
       }))
 
     if (notifications.length > 0) {
-      await prisma.notification.createMany({ data: notifications })
+      await sendManyNotifications(notifications)
     }
   }
 

@@ -59,6 +59,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '已删除的项目' }
       },
       {
+        path: 'messages',
+        name: 'Messages',
+        component: () => import('@/views/messages/MessagesPage.vue'),
+        meta: { title: '消息中心' }
+      },
+      {
         path: 'projects/:id',
         name: 'ProjectDetail',
         component: () => import('@/views/project/ProjectDetail.vue'),

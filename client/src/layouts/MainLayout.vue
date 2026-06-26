@@ -55,6 +55,14 @@
           </li>
           <li>
             <NavItem
+              to="/messages"
+              icon="Bell"
+              label="消息中心"
+              :active="currentRoute === '/messages'"
+            />
+          </li>
+          <li>
+            <NavItem
               to="/reports"
               icon="FileText"
               label="总结归档"
@@ -164,19 +172,21 @@
             <span class="hidden md:inline">批量导入</span>
           </button>
 
-          <!-- 通知按钮 -->
-          <button
-            @click="showNotifications = !showNotifications"
+          <!-- 通知按钮 (r0 §4: 点击直接跳 /messages) -->
+          <router-link
+            to="/messages"
             class="relative p-2.5 hover:bg-gray-100 rounded-xl transition-all duration-200"
+            data-testid="bell-button"
           >
             <Bell class="w-5 h-5" style="color: var(--color-text-secondary)" />
             <span
               v-if="notificationStore.unreadCount > 0"
               class="absolute -top-0.5 -right-0.5 min-w-[20px] h-5 px-1.5 text-xs font-medium rounded-full flex items-center justify-center notification-badge"
+              data-testid="header-unread-badge"
             >
               {{ notificationStore.unreadCount > 9 ? '9+' : notificationStore.unreadCount }}
             </span>
-          </button>
+          </router-link>
 
           <!-- 设置按钮 -->
           <router-link

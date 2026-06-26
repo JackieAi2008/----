@@ -5,6 +5,7 @@ import { Request, Response } from 'express'
 import prisma from '../config/database.js'
 import { ApiError } from '../middlewares/errorHandler.js'
 import { AuthRequest } from '../middlewares/auth.js'
+import { send as sendNotification } from '../services/notificationService.js'
 
 /**
  * 获取当前用户的项目列表
@@ -527,15 +528,13 @@ export async function inviteUser(req: Request, res: Response) {
   })
 
   // 创建通知
-  await prisma.notification.create({
-    data: {
-      userId: inviteeId,
-      type: 'PROJECT_INVITE',
-      title: '项目邀请',
-      content: `您被邀请加入项目「${project.name}」`,
-      relatedType: 'PROJECT',
-      relatedId: id
-    }
+  await sendNotification({
+    userId: inviteeId,
+    category: 'INVITE',
+    title: '项目邀请',
+    content: `您被邀请加入项目「${project.name}」`,
+    relatedType: 'PROJECT',
+    relatedId: id
   })
 
   res.status(201).json({

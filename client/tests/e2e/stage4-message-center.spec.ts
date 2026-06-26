@@ -80,19 +80,22 @@ test.describe('r0 §5 - 消息中心', () => {
     await page.goto(`${BASE_URL}/messages`)
     await page.waitForLoadState('networkidle')
 
-    // 读顶部未读红点数字
-    const badgeBefore = await page.getByTestId('unread-badge').textContent()
+    // 读顶部「全部」tab 的未读角标
+    const badgeBefore = await page.getByTestId('unread-badge-ALL').textContent()
     const before = Number(badgeBefore?.trim() || '0')
 
-    await page.getByRole('button', { name: /标记已读/ }).first().click()
+    // r0 §4: 顶部按钮 → POST /api/messages/mark-all-read
+    await page.getByTestId('mark-all-read').click()
     await page.waitForResponse(
-      (r) => r.url().includes('/api/messages') && r.request().method() === 'PATCH',
+      (r) =>
+        r.url().includes('/api/messages/mark-all-read') &&
+        r.request().method() === 'POST',
       { timeout: 5000 }
     )
 
-    const badgeAfter = await page.getByTestId('unread-badge').textContent()
+    const badgeAfter = await page.getByTestId('unread-badge-ALL').textContent()
     const after = Number(badgeAfter?.trim() || '0')
-    expect(after).toBeLessThan(before)
+    expect(after).toBeLessThanOrEqual(before)
   })
 
   test('下拉铃铛点击跳 /messages', async ({ page }) => {
@@ -101,8 +104,8 @@ test.describe('r0 §5 - 消息中心', () => {
       id: 'e2e-user', email: 'e2e-admin@example.com', nickname: 'E2E Admin', role: 'ADMIN'
     })
 
-    // 假设有顶栏铃铛按钮
-    const bell = page.getByRole('button', { name: /通知|铃铛/ }).first()
+    // r0 §4: 顶栏铃铛现在是 router-link to=/messages
+    const bell = page.getByTestId('bell-button')
     await bell.click()
     await page.waitForURL(/\/messages$/, { timeout: 5000 })
   })

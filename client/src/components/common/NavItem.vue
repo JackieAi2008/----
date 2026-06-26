@@ -42,7 +42,8 @@ import {
   Users,
   LayoutDashboard,
   Trash2,
-  Building2
+  Building2,
+  Bell
 } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -61,7 +62,8 @@ const iconMap: Record<string, Component> = {
   Users,
   LayoutDashboard,
   Trash2,
-  Building2
+  Building2,
+  Bell
 }
 
 const iconComponent = computed(() => iconMap[props.icon] || Calendar)

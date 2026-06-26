@@ -17,6 +17,7 @@ import userRoutes from './routes/users.js'
 import projectRoutes from './routes/projects.js'
 import taskRoutes from './routes/tasks.js'
 import notificationRoutes from './routes/notifications.js'
+import messagesRoutes from './routes/messages.js'
 import dashboardRoutes from './routes/dashboard.js'
 import attachmentRoutes from './routes/attachments.js'
 import exportRoutes from './routes/export.js'
@@ -62,6 +63,7 @@ app.use('/api/users', userRoutes)
 app.use('/api/projects', projectRoutes)
 app.use('/api/tasks', taskRoutes)
 app.use('/api/notifications', notificationRoutes)
+app.use('/api/messages', messagesRoutes)
 app.use('/api/dashboard', dashboardRoutes)
 app.use('/api', attachmentRoutes)
 app.use('/api/export', exportRoutes)

@@ -4,6 +4,7 @@
  */
 import prisma from '../config/database.js'
 import { logger } from '../utils/logger.js'
+import { send as sendNotification } from './notificationService.js'
 
 // 重复类型
 export type RepeatType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'
@@ -118,15 +119,13 @@ export async function createNextRecurringTask(taskId: string): Promise<{
 
     // 发送通知给负责人
     if (originalTask.assigneeId) {
-      await prisma.notification.create({
-        data: {
-          userId: originalTask.assigneeId,
-          type: 'TASK_RECURRING',
-          title: '重复任务已生成',
-          content: `您的重复任务「${originalTask.title}」已生成新的任务实例`,
-          relatedType: 'TASK',
-          relatedId: newTask.id
-        }
+      await sendNotification({
+        userId: originalTask.assigneeId,
+        category: 'TASK_REMINDER',
+        title: '重复任务已生成',
+        content: `您的重复任务「${originalTask.title}」已生成新的任务实例`,
+        relatedType: 'TASK',
+        relatedId: newTask.id
       })
     }
 

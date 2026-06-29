@@ -26,7 +26,7 @@
  *     - PROJECT_INVITE    -> INVITE
  *     - TASK_ASSIGNED     -> TASK_REMINDER
  *     - EVALUATION_SUBMITTED -> EVALUATION
- *     - MENTION           -> MENTION
+ *     - MENTION / TASK_COMMENT -> TASK_REMINDER (r1 §6a: @user 通知统一到 TASK_REMINDER)
  *     - 未知 -> SYSTEM
  */
 import request from 'supertest'
@@ -463,9 +463,10 @@ describe('r0 §4 消息中心', () => {
           return 'TASK_REMINDER'
         case 'EVALUATION_SUBMITTED':
           return 'EVALUATION'
+        // r1 §6a: @user 通知统一到 TASK_REMINDER
         case 'MENTION':
         case 'TASK_COMMENT':
-          return 'MENTION'
+          return 'TASK_REMINDER'
         case 'PROJECT_JOIN_APPROVED':
         case 'PROJECT_JOIN_REJECTED':
         case 'PROJECT_UPDATED':
@@ -483,9 +484,10 @@ describe('r0 §4 消息中心', () => {
       ['TASK_STATUS_CHANGED', 'TASK_REMINDER'],
       ['TASK_COLLABORATOR', 'TASK_REMINDER'],
       ['TASK_RECURRING', 'TASK_REMINDER'],
-      ['TASK_COMMENT', 'MENTION'],
+      // r1 §6a: @user 通知统一到 TASK_REMINDER
+      ['TASK_COMMENT', 'TASK_REMINDER'],
       ['EVALUATION_SUBMITTED', 'EVALUATION'],
-      ['MENTION', 'MENTION'],
+      ['MENTION', 'TASK_REMINDER'],
       ['PROJECT_JOIN_APPROVED', 'SYSTEM'],
       ['PROJECT_JOIN_REJECTED', 'SYSTEM'],
       ['PROJECT_UPDATED', 'SYSTEM'],

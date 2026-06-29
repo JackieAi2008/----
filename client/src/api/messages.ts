@@ -91,6 +91,11 @@ export async function markMessageRead(id: string): Promise<MarkAllReadResponse> 
 
 /**
  * 直接把 Notification 转成跳转 URL (前端 spec §6)
+ *
+ * r1 §6a microadjust (A2): MENTION 类别跳转路由占位
+ *   - 历史原因: 之前 @ 我 tab 点击是空头支票 (代码占位但实际没实现 @ 通知)
+ *   - 现约定:   MENTION 路由跳到 `task/:id?tab=comment`, 为未来真实现 @ 评论通知时备用
+ *   - 注意:     本轮路由占位即可, 不需要真实现 @ 评论通知生成
  */
 export function routeForMessage(n: Notification): string | null {
   // 优先按 category 路由(SYSTEM 不跳)
@@ -102,9 +107,8 @@ export function routeForMessage(n: Notification): string | null {
     case 'EVALUATION':
       return n.relatedId ? `/tasks/${n.relatedId}?tab=evaluation` : null
     case 'MENTION':
-      return n.relatedId
-        ? `/tasks/${n.relatedId}?comment=${n.relatedId}`
-        : null
+      // r1 §6a: 改为 `task/:id?tab=comment` 占位, 等待真实现 @ 评论通知时启用
+      return n.relatedId ? `/tasks/${n.relatedId}?tab=comment` : null
     case 'SYSTEM':
     default:
       return null

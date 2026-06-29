@@ -37,6 +37,25 @@ export function errorHandler(
     })
   }
 
+  // Multer 错误 (r1 §6a 资料库上传)
+  // MulterError.code: 'LIMIT_FILE_SIZE' | 'LIMIT_UNEXPECTED_FILE' | ...
+  if (err.constructor?.name === 'MulterError' || (err as { name?: string }).name === 'MulterError') {
+    const mErr = err as unknown as { code?: string; field?: string }
+    if (mErr.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({
+        success: false,
+        error: 'FILE_TOO_LARGE',
+        message: '文件超过大小上限 (5MB)',
+        code: 'FILE_TOO_LARGE'
+      })
+    }
+    return res.status(400).json({
+      success: false,
+      error: mErr.code ?? 'UPLOAD_ERROR',
+      message: err.message
+    })
+  }
+
   // Prisma错误处理
   if (err.constructor.name === 'PrismaClientKnownRequestError') {
     const prismaError = err as unknown as { code: string; meta?: { target?: string[] } }

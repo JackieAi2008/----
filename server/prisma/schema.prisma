@@ -41,7 +41,7 @@ model Comment {
   taskId    String
   userId    String
   content   String
-  type      String    @default("COMMENT")  // 'COMMENT' | 'PROGRESS'
+  type      String    @default("COMMENT") // 'COMMENT' | 'PROGRESS'
   mentions  String?
   replyToId String?
   images    String?
@@ -55,17 +55,87 @@ model Comment {
 }
 
 model Department {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  description String?
-  adminId     String    @unique
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  admin       User      @relation("Department_adminIdToUser", fields: [adminId], references: [id], onDelete: Cascade)
-  projects    Project[]
-  members     User[]    @relation("User_departmentIdToDepartment")
+  id            String         @id @default(cuid())
+  name          String         @unique
+  description   String?
+  adminId       String         @unique
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  admin         User           @relation("Department_adminIdToUser", fields: [adminId], references: [id], onDelete: Cascade)
+  libraryAssets LibraryAsset[]
+  projects      Project[]
+  members       User[]         @relation("User_departmentIdToDepartment")
 
   @@index([name])
+}
+
+/// r1 §6a 资料库 (图片档案)
+///
+/// 与 Attachment (任务附件) 完全物理隔离:
+///   - LibraryAsset 在 uploads/library/YYYY/MM/, Attachment 在 uploads/attachments/
+///   - 两个表互不引用
+///   - 历史 Attachment 不迁移
+///
+/// 4 档可见性 (D-5.1): PRIVATE | DEPARTMENT | PROJECT | PUBLIC
+/// projectId 仅在 visibility=PROJECT 时必填 (D-5.2: owner 必须是项目成员 + 项目未归档)
+/// 30 天软删 → 硬删 (D-5.3)
+/// 单图 5MB / 单人 200MB / 全站 2GB (D-5.4 + D-5.5)
+/// 删除权限: owner (软) + admin (硬) (D-5.9)
+model LibraryAsset {
+  id           String    @id @default(cuid())
+  title        String
+  originalName String
+  filename     String
+  mimeType     String
+  size         Int
+  width        Int?
+  height       Int?
+  storagePath  String
+  visibility   String    @default("DEPARTMENT")
+  projectId    String?
+  departmentId String?
+  ownerId      String
+  tags         String?
+  uploaderNote String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  owner      User        @relation("LibraryAsset_owner", fields: [ownerId], references: [id], onDelete: Cascade)
+  project    Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId])
+  @@index([projectId])
+  @@index([departmentId])
+  @@index([visibility])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@index([mimeType])
+}
+
+/// r1 §6a 全站资料库用量计数 (单行,id='singleton')
+///
+/// ORG_QUOTA race condition 缓解:
+///   - 上传时 `UPDATE counter SET usedBytes = usedBytes + ?` 原子递增
+///   - 超阈值即回滚递增 + 返回 507
+///   - 软删/恢复分别 -/+ size
+///   - 30 天清理 cron 重新同步 usedBytes = (SELECT SUM(size) WHERE deletedAt IS NULL)
+model OrgQuotaCounter {
+  id        String   @id @default("singleton")
+  usedBytes Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+/// r1 §6a 单人资料库用量计数 (按 userId 维度)
+///
+/// USER_QUOTA race condition 缓解: 与 OrgQuotaCounter 同套路, 原子递增
+/// 上传 + 软删/恢复 同步
+model UserQuotaCounter {
+  userId    String   @id
+  usedBytes Int      @default(0)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Notification {
@@ -89,22 +159,23 @@ model Notification {
 }
 
 model Project {
-  id            String          @id @default(cuid())
+  id            String           @id @default(cuid())
   name          String
   description   String?
   cover         String?
-  visibility    String          @default("PRIVATE")
-  category      String?         // PARTY_BUILDING | TRADE_UNION | COMMUNIST_YOUTH_LEAGUE | PUBLIC_WELFARE | COMPREHENSIVE
+  visibility    String           @default("PRIVATE")
+  category      String? // PARTY_BUILDING | TRADE_UNION | COMMUNIST_YOUTH_LEAGUE | PUBLIC_WELFARE | COMPREHENSIVE
   ownerId       String
   departmentId  String?
-  isArchived    Boolean         @default(false)
+  isArchived    Boolean          @default(false)
   archivedAt    DateTime?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
   deletedAt     DateTime?
-  department    Department?     @relation(fields: [departmentId], references: [id])
-  owner         User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  department    Department?      @relation(fields: [departmentId], references: [id])
+  owner         User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   invites       ProjectInvite[]
+  libraryAssets LibraryAsset[]
   summaries     ProjectSummary[]
   members       ProjectMember[]
   tasks         Task[]
@@ -118,16 +189,16 @@ model Project {
 }
 
 model ProjectInvite {
-  id         String   @id @default(cuid())
-  projectId  String
-  inviterId  String
-  inviteeId  String
-  status     String   @default("PENDING")
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
-  invitee    User     @relation("ProjectInvite_inviteeIdToUser", fields: [inviteeId], references: [id], onDelete: Cascade)
-  inviter    User     @relation("ProjectInvite_inviterIdToUser", fields: [inviterId], references: [id], onDelete: Cascade)
-  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  projectId String
+  inviterId String
+  inviteeId String
+  status    String   @default("PENDING")
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  invitee   User     @relation("ProjectInvite_inviteeIdToUser", fields: [inviteeId], references: [id], onDelete: Cascade)
+  inviter   User     @relation("ProjectInvite_inviterIdToUser", fields: [inviterId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([status])
 }
@@ -177,9 +248,9 @@ model Task {
   dueDate        DateTime
   categoryId     String?
   assigneeId     String
-  priority       String             @default("IMPORTANT_URGENT")  // IMPORTANT_URGENT | IMPORTANT_NOT_URGENT | URGENT_NOT_IMPORTANT | NOT_IMPORTANT_NOT_URGENT
+  priority       String             @default("IMPORTANT_URGENT") // IMPORTANT_URGENT | IMPORTANT_NOT_URGENT | URGENT_NOT_IMPORTANT | NOT_IMPORTANT_NOT_URGENT
   status         String             @default("TODO")
-  visibility     String             @default("PUBLIC")  // 固定为公开
+  visibility     String             @default("PUBLIC") // 固定为公开
   deliverable    String?
   tags           String?
   reminder       String?
@@ -187,9 +258,9 @@ model Task {
   creatorId      String
   isArchived     Boolean            @default(false)
   archivedAt     DateTime?
-  completedAt    DateTime?          // 完成时间，status→DONE 时自动记录
-  completedBy    String?            // 完成操作人 ID
-  completionNote String?            // 完成备注（用户填写）
+  completedAt    DateTime? // 完成时间，status→DONE 时自动记录
+  completedBy    String? // 完成操作人 ID
+  completionNote String? // 完成备注（用户填写）
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   deletedAt      DateTime?
@@ -209,15 +280,15 @@ model Task {
 }
 
 model TaskCategory {
-  id           String         @id @default(cuid())
-  projectId    String?
-  name         String
-  color        String
-  isSystem     Boolean        @default(false)
-  createdAt    DateTime       @default(now())
-  tasks        Task[]
-  project      Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  templates    TaskTemplate[]
+  id        String         @id @default(cuid())
+  projectId String?
+  name      String
+  color     String
+  isSystem  Boolean        @default(false)
+  createdAt DateTime       @default(now())
+  tasks     Task[]
+  project   Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  templates TaskTemplate[]
 }
 
 model TaskCollaborator {
@@ -247,73 +318,75 @@ model TaskTemplate {
 }
 
 model User {
-  id                                          String             @id @default(cuid())
-  email                                       String             @unique
-  password                                    String
-  nickname                                    String?
-  avatar                                      String?
-  bio                                         String?
-  isAdmin                                     Boolean            @default(false)
-  isBanned                                    Boolean            @default(false)
-  departmentId                                String?
-  createdAt                                   DateTime           @default(now())
-  updatedAt                                   DateTime           @updatedAt
-  attachments                                 Attachment[]
-  auditLogs                                   AuditLog[]
-  comments                                    Comment[]
-  managedDepartment                           Department?        @relation("Department_adminIdToUser")
-  notifications                               Notification[]
-  ownedProjects                               Project[]
-  receivedInvites                             ProjectInvite[]    @relation("ProjectInvite_inviteeIdToUser")
-  sentInvites                                 ProjectInvite[]    @relation("ProjectInvite_inviterIdToUser")
-  projectMemberships                          ProjectMember[]
-  authoredSummaries                           ProjectSummary[]
-  pushSubscriptions                           PushSubscription[]
-  securityAnswers                             SecurityAnswer[]
-  createdTasks                                Task[]             @relation("Task_creatorIdToUser")
-  assignedTasks                               Task[]             @relation("Task_assigneeIdToUser")
-  taskCollaborations                          TaskCollaborator[]
-  taskTemplates                               TaskTemplate[]
-  department                                  Department?        @relation("User_departmentIdToDepartment", fields: [departmentId], references: [id])
-  givenEvaluations                            Evaluation[]       @relation("Evaluation_evaluator")
-  receivedEvaluations                         Evaluation[]       @relation("Evaluation_target")
+  id                  String             @id @default(cuid())
+  email               String             @unique
+  password            String
+  nickname            String?
+  avatar              String?
+  bio                 String?
+  isAdmin             Boolean            @default(false)
+  isBanned            Boolean            @default(false)
+  departmentId        String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  attachments         Attachment[]
+  auditLogs           AuditLog[]
+  comments            Comment[]
+  managedDepartment   Department?        @relation("Department_adminIdToUser")
+  libraryAssets       LibraryAsset[]     @relation("LibraryAsset_owner")
+  libraryQuota        UserQuotaCounter?
+  notifications       Notification[]
+  ownedProjects       Project[]
+  receivedInvites     ProjectInvite[]    @relation("ProjectInvite_inviteeIdToUser")
+  sentInvites         ProjectInvite[]    @relation("ProjectInvite_inviterIdToUser")
+  projectMemberships  ProjectMember[]
+  authoredSummaries   ProjectSummary[]
+  pushSubscriptions   PushSubscription[]
+  securityAnswers     SecurityAnswer[]
+  createdTasks        Task[]             @relation("Task_creatorIdToUser")
+  assignedTasks       Task[]             @relation("Task_assigneeIdToUser")
+  taskCollaborations  TaskCollaborator[]
+  taskTemplates       TaskTemplate[]
+  department          Department?        @relation("User_departmentIdToDepartment", fields: [departmentId], references: [id])
+  givenEvaluations    Evaluation[]       @relation("Evaluation_evaluator")
+  receivedEvaluations Evaluation[]       @relation("Evaluation_target")
 
   @@index([departmentId])
 }
 
-
 model ProjectSummary {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   projectId     String
   authorId      String
   title         String
   content       String
-  summaryType   String   @default("WORK") // WORK | AI
+  summaryType   String    @default("WORK") // WORK | AI
   aiContent     String?
   aiGeneratedAt DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  author        User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author        User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([authorId])
 }
+
 model Evaluation {
   id           String   @id @default(cuid())
   taskId       String
-  evaluatorId  String   // 评价人（全局管理者）
-  targetUserId String   // 被评价人
-  projectId    String   // 所属项目
-  rating       Int      // 1-5 星
-  comment      String?  // 评价备注
+  evaluatorId  String // 评价人（全局管理者）
+  targetUserId String // 被评价人
+  projectId    String // 所属项目
+  rating       Int // 1-5 星
+  comment      String? // 评价备注
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  evaluator   User    @relation("Evaluation_evaluator", fields: [evaluatorId], references: [id], onDelete: Cascade)
-  targetUser  User    @relation("Evaluation_target", fields: [targetUserId], references: [id], onDelete: Cascade)
-  task        Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  project     Project @relation(fields: [projectId], references: [id])
+  evaluator  User    @relation("Evaluation_evaluator", fields: [evaluatorId], references: [id], onDelete: Cascade)
+  targetUser User    @relation("Evaluation_target", fields: [targetUserId], references: [id], onDelete: Cascade)
+  task       Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  project    Project @relation(fields: [projectId], references: [id])
 
   @@unique([taskId, targetUserId, evaluatorId])
   @@index([evaluatorId])

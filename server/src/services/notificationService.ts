@@ -5,8 +5,14 @@
  * 避免 category/priority 字段散落在 controller 里漏填。
  *
  * 字段约定:
- *   category: TASK_REMINDER | INVITE | EVALUATION | MENTION | SYSTEM
+ *   category: TASK_REMINDER | INVITE | EVALUATION | MENTION(已废弃) | SYSTEM
  *   priority: NORMAL | HIGH
+ *
+ * r1 §6a microadjust (A1): 所有「@user 聚合」类通知统一使用 TASK_REMINDER
+ *   - 历史原因: 老 schema 中 @user 通知分散在 MENTION 和 TASK_COMMENT 两个 type
+ *   - 现约定:   未来任何 @user 通知直接 send({ category: 'TASK_REMINDER', ... })
+ *   - 旧数据:   历史行 (category=MENTION) 保留不动; 新代码禁止再写入 MENTION
+ *   - 注意:     MENTION 仍作为 category 枚举值存在, 仅用于向前兼容老 schema 数据
  *
  * 老的 prisma.notification.create / createMany 直接调用点
  * 已在 §4 重构为 send / sendMany, 老端点 GET /api/notifications
@@ -19,6 +25,7 @@ export type NotificationCategory =
   | 'TASK_REMINDER'
   | 'INVITE'
   | 'EVALUATION'
+  /** @deprecated r1 §6a: @user 通知已统一到 TASK_REMINDER, 禁止新代码写入 */
   | 'MENTION'
   | 'SYSTEM'
 
@@ -84,6 +91,11 @@ export async function sendMany(
 /**
  * 推断 category 的辅助:基于老的 type 字符串(用于历史代码路径的渐进迁移)。
  * 不建议新代码使用 — 直接传 category 更清晰。
+ *
+ * r1 §6a microadjust (A1): 历史 type=MENTION 和 type=TASK_COMMENT 都映射到
+ * TASK_REMINDER (与新策略保持一致)。注意:实际历史数据已经通过 §4 migration
+ * 写入为 category=MENTION, 本函数仅在「假设历史数据按本函数映射」的场景下
+ * 提供参照(比如再次导入外部数据源)。
  */
 export function inferCategoryFromLegacyType(
   type: string
@@ -100,9 +112,10 @@ export function inferCategoryFromLegacyType(
       return 'TASK_REMINDER'
     case 'EVALUATION_SUBMITTED':
       return 'EVALUATION'
+    // r1 §6a: @user 通知统一到 TASK_REMINDER (历史 MENTION/TASK_COMMENT 走同一条路径)
     case 'MENTION':
     case 'TASK_COMMENT':
-      return 'MENTION'
+      return 'TASK_REMINDER'
     case 'PROJECT_JOIN_APPROVED':
     case 'PROJECT_JOIN_REJECTED':
     case 'PROJECT_UPDATED':

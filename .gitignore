@@ -64,6 +64,11 @@ uploads/
 .harness/repos/
 .mavis/scratchpads/
 .mavis/sessions/
+# orchestrator 的运行时通讯 (inbox-* / spawn-cfg-*) 不入库
+.harness/inbox-*
+.harness/.spawn-cfg-*
+# mavis plans 是 mavis runtime 生成的恢复计划, 不是项目代码
+.mavis/plans/
 
 # ===== 系统与 IDE 文件 =====
 .DS_Store

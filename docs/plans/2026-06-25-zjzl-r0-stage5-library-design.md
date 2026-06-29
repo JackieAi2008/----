@@ -521,22 +521,22 @@ function buildLibraryWhere(currentUser: User): Prisma.LibraryAssetWhereInput {
 
 > **格式**: 决策点 / 选项 / 我的倾向 / 理由 / 待用户拍板
 
-| # | 决策点 | 选项 | 我的倾向 | 理由 | 待用户拍板 |
-|---|--------|------|----------|------|-----------|
-| **D-5.1** | 可见性档位 | A. 3 档 (私人/部门/公开) / **B. 4 档 (+项目)** / C. 2 档 (私人/公开) | **B. 4 档** | 资料库常用于"项目相册",与项目绑定是高频用例;3 档缺项目级粒度,2 档太粗 | ✅ 需拍板 |
-| **D-5.2** | 项目可见性的 projectId 校验 | A. 必填 owner 必须是项目成员 / B. 任意项目 ID 都可 / **C. owner 必须是项目成员 + 项目未归档** | **C** | B 任意项目能选 → 越权;C 限制 owner 必须是成员 + 项目未归档,合理 | (随 D-5.1 一起) |
-| **D-5.3** | 软删 vs 硬删 | **A. 软删 + 30 天 + 定时清理** / B. 硬删 (立即删) / C. 软删 + 永久保留 | **A** | 误删可恢复,管理员可绕过;30 天是行业惯例;永久保留会爆盘 | ✅ 需拍板 |
+| # | 决策点 | 选项 | 用户拍板 | 理由 | 状态 |
+|---|--------|------|----------|------|------|
+| **D-5.1** | 可见性档位 | A. 3 档 (私人/部门/公开) / **B. 4 档 (+项目)** / C. 2 档 (私人/公开) | **B. 4 档** | 资料库常用于"项目相册",与项目绑定是高频用例;3 档缺项目级粒度,2 档太粗 | ✅ 已拍 (用户 06-26) |
+| **D-5.2** | 项目可见性的 projectId 校验 | A. 必填 owner 必须是项目成员 / B. 任意项目 ID 都可 / **C. owner 必须是项目成员 + 项目未归档** | **C** | B 任意项目能选 → 越权;C 限制 owner 必须是成员 + 项目未归档,合理 | ✅ 已拍 (随 D-5.1, 用户 06-26) |
+| **D-5.3** | 软删 vs 硬删 | **A. 软删 + 30 天 + 定时清理** / B. 硬删 (立即删) / C. 软删 + 永久保留 | **A. 30 天回收站** | 误删可恢复,管理员可绕过;30 天是行业惯例;永久保留会爆盘 | ✅ 已拍 (用户 06-26) |
 | **D-5.4** | 容量限额 (双层) | A. 200MB 单用户 / **B. 200MB/用户 + 2GB/全站** / C. 500MB 单用户 / D. 不限 | **B. 200MB + 2GB** | 用户拍板:个人 200MB (20 张 10MB 图够个人用),全站 2GB (10 人团队 × 200MB = 2GB 满载,符合「5-10 人小团队」规模假设);两限同时校验,任一超即 507 阻断;P2 可加 admin 调阈值的 env 配置 | ✅ 已拍 (用户 06-26) |
-| **D-5.5** | 单文件大小上限 | **A. 10MB** (与 Attachment 一致) / B. 20MB / C. 5MB | **A. 10MB** | 与现有 `Attachment` (10MB) 一致,前端组件复用;5MB 太紧,20MB 加磁盘压力 | (低风险,可不拍) |
-| **D-5.6** | mime 过滤是否走 file-type 二次校验 | A. 只 multer mimetype / **B. multer mimetype + file-type magic number** | **B** | A 易被绕 (改后缀);B 用 sharp / file-type 读 magic number,准确 | (低风险,可不拍) |
-| **D-5.7** | 缩略图策略 | **A. 不生成,前端 CSS 缩** / B. sharp 生成 240x240 webp 缓存 / C. 按需动态 resize | **A. 不生成** (本轮) | B/C 加 native dep (sharp),部署复杂度↑;本轮 10MB 单图前端 CSS 缩够用,首屏可能慢但可接受 | ✅ 需拍板 (后续 P2 再加 B) |
-| **D-5.8** | 批量下载打包上限 | A. 100 张 / **B. 50 张** / C. 不限 | **B. 50 张** | 50 张 × 5MB avg = 250MB zip,单请求安全;100 张 zip 内存风险 | (低风险,可不拍) |
-| **D-5.9** | 删除权限 | A. 仅 owner / **B. owner + admin** / C. owner + admin + 项目成员 | **B. owner + admin** | A 太严,误传 admin 不能清;C 项目成员删别人的不合理 | ✅ 需拍板 |
-| **D-5.10** | 标签存储 | **A. 逗号分隔字符串** / B. JSON 数组 / C. 独立 `LibraryTag` 表 + 多对多 | **A. 字符串** | 标签是低频编辑 + 简单检索;JSON 难 LIKE;独立表 over-engineering (阶段 6 再升级) | (低风险,可不拍) |
-| **D-5.11** | 导航位置 | **A. 主菜单「项目」后** / B. 主菜单「总结归档」后 / C. 「管理」下 (限 admin) | **A. 项目后** | 资料库是日常高频,与项目并列;C 不对,普通用户也用 | (低风险,可不拍) |
-| **D-5.12** | 预览组件 | A. vue-image-lightbox / **B. 自研** / C. Element Plus el-image-viewer | **B. 自研** | A 加新 dep + bundle 体积↑;C 依赖 Element Plus;现有 deps 未含,B 自研可控 | (低风险,可不拍) |
-| **D-5.13** | 与现有 Attachment 关系 | **A. 完全分离,不迁移** / B. 一次性迁移附件到 LibraryAsset / C. Attachment 改名 LibraryAsset | **A. 完全分离** | B/C 风险大,改 8 个附件调用点;A UI 上明确分离 | ✅ 需拍板 (高影响) |
-| **D-5.14** | Admin 看私人图片 | A. 完全不可见 / **B. admin 全可见 (审计)** / C. admin 看 metadata 但不看文件 | **B. admin 全可见** | 审计 + 误传清理需要;C 半权限产品上反直觉 | (随 D-5.13 一起) |
+| **D-5.5** | 单文件大小上限 | A. 10MB (与 Attachment 一致) / B. 20MB / **C. 5MB** | **C. 5MB** | 用户拍板:10MB 与资料库"不生成缩略图"配合首屏太慢;5MB 是手机照主流大小,90% 场景覆盖;前端 CSS 缩 5MB 流量可控;与老附件 10MB 体验割裂由 PM 在用户引导文案上对齐 | ✅ 已拍 (用户 06-26) |
+| **D-5.6** | mime 过滤是否走 file-type 二次校验 | A. 只 multer mimetype / **B. multer mimetype + file-type magic number** | **B** | A 易被绕 (改后缀);B 用 sharp / file-type 读 magic number,准确 | ✅ 已拍 (随 D-5.7, 用户 06-26) |
+| **D-5.7** | 缩略图策略 | **A. 不生成,前端 CSS 缩** / B. sharp 生成 240x240 webp 缓存 / C. 按需动态 resize | **A. 不生成** | 用户拍板:加 sharp 要在 ECS 上装 native dep, 部署复杂度↑;本轮配合 D-5.5 5MB 单图,前端 CSS 缩够用;P2 再加 sharp | ✅ 已拍 (用户 06-26) |
+| **D-5.8** | 批量下载打包上限 | A. 100 张 / **B. 50 张** / C. 不限 | **B. 50 张** (随主决策, 由 dev 决定) | 50 张 × 5MB avg = 250MB zip,单请求安全;100 张 zip 内存风险 | (低风险, dev 自决) |
+| **D-5.9** | 删除权限 | A. 仅 owner / **B. owner + admin** / C. owner + admin + 项目成员 | **B. owner + admin** | A 太严,误传 admin 不能清;C 项目成员删别人的不合理 | ✅ 已拍 (用户 06-26) |
+| **D-5.10** | 标签存储 | **A. 逗号分隔字符串** / B. JSON 数组 / C. 独立 `LibraryTag` 表 + 多对多 | **A. 字符串** (随主决策, 由 dev 决定) | 标签是低频编辑 + 简单检索;JSON 难 LIKE;独立表 over-engineering (阶段 6 再升级) | (低风险, dev 自决) |
+| **D-5.11** | 导航位置 (D-nav) | **A. 主菜单「项目」后** / B. 主菜单「总结归档」后 / C. 「管理」下 (限 admin) | **A. 项目后** | 资料库是日常高频,与项目并列;C 不对,普通用户也用 | ✅ 已拍 (用户 06-26) |
+| **D-5.12** | 预览组件 | A. vue-image-lightbox / **B. 自研** / C. Element Plus el-image-viewer | **B. 自研** (随主决策, 由 dev 决定) | A 加新 dep + bundle 体积↑;C 依赖 Element Plus;现有 deps 未含,B 自研可控 | (低风险, dev 自决) |
+| **D-5.13** | 与现有 Attachment 关系 | **A. 完全分离,不迁移** / B. 一次性迁移附件到 LibraryAsset / C. Attachment 改名 LibraryAsset | **A. 完全分离** | B/C 风险大,改 8 个附件调用点;A UI 上明确分离 | ✅ 已拍 (用户 06-26) |
+| **D-5.14** | Admin 看私人图片 | A. 完全不可见 / **B. admin 全可见 (审计)** / C. admin 看 metadata 但不看文件 | **B. admin 全可见** | 审计 + 误传清理需要;C 半权限产品上反直觉 | ✅ 已拍 (随 D-5.13, 用户 06-26) |
 
 ---
 
@@ -583,4 +583,4 @@ function buildLibraryWhere(currentUser: User): Prisma.LibraryAssetWhereInput {
 
 ---
 
-> **结束**。本文档可交付 zjzl-dev 全栈开发 + zjzl-test 验收。需 orchestrator 与用户对齐 §8 决策点 D-5.1 / D-5.3 / D-5.4 / D-5.7 / D-5.9 / D-5.13 共 6 个高影响项 (其余 8 个低风险可由 zjzl-dev 自行决定并写进 commit message)。
+> **结束**。本文档可交付 zjzl-dev 全栈开发 + zjzl-test 验收。§8 共 14 个决策点, 用户 2026-06-26 全部拍板完成 (9 个高影响已用户拍 + 5 个低风险由 dev 自决并写进 commit message)。

@@ -32,6 +32,8 @@ server/prisma/prisma/
 
 # 日志目录
 server/logs/
+# zjzl-test 偶发的 stdout/stderr 捕获 (进程占句柄没法 trash, 加规则不影响下次)
+server/logs-verify-server.*
 # 兜底:根目录的 .log 文件
 *.log
 npm-debug.log*
